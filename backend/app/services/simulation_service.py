@@ -1,3 +1,18 @@
+"""
+backend/app/services/simulation_service.py
+==========================================
+Replaces the placeholder simulate() with the real
+SimPy-based Monte Carlo simulation model.
+
+Expects simulation_model.py and calibration.json to be
+at the project root (same level as backend/).
+
+Path resolution works whether you run from root or from backend/.
+"""
+
+import os
+import sys
+import traceback
 from typing import Dict, Union
 
 from app.schemas.response_schema import PredictionResponse, SimulationResponse
@@ -5,31 +20,206 @@ from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+# ── Locate project root and inject into path ──────────────────────
+# Handles both: running from repo root OR from backend/
+_HERE       = os.path.dirname(os.path.abspath(__file__))
+_BACKEND    = os.path.abspath(os.path.join(_HERE, "../../.."))   # backend/../.. = root
+_ROOT       = _BACKEND if os.path.exists(os.path.join(_BACKEND, "simulation_model.py")) \
+              else os.path.abspath(os.path.join(_BACKEND, ".."))
+
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+
+try:
+    from simulation_model import SimulationModel, format_for_llm   # noqa: E402
+    _SIM_AVAILABLE = True
+    logger.info("simulation_model.py loaded successfully from %s", _ROOT)
+except ImportError as e:
+    logger.warning("simulation_model.py not found: %s — falling back to placeholder", e)
+    _SIM_AVAILABLE = False
+
+# ── Port name → PortWatch portid map ─────────────────────────────
+PORT_NAME_TO_ID: Dict[str, str] = {
+    "jnpt":                      "port776",
+    "nhava sheva":               "port776",
+    "mumbai-jawaharlal nehru (nhava sheva)": "port776",
+    "mundra":                    "port777",
+    "chennai":                   "port235",
+    "chennai (madras)":          "port235",
+    "visakhapatnam":             "port1367",
+    "vizag":                     "port1367",
+    "kolkata":                   "port442",
+    "kolkata (syama prasad mookerje port)": "port442",
+    "haldia":                    "port442",
+    "cochin":                    "port583",
+    "cochin (kochi)":            "port583",
+    "kochi":                     "port583",
+    "pipavav":                   "port907",
+    "shanghai":                  "port1188",
+    "shanghai (pudong)":         "port1188",
+    "singapore":                 "port1201",
+    "ningbo":                    "port824",
+    "shenzhen":                  "port1189",
+    "yantian":                   "port1189",
+    "busan":                     "port1065",
+    "hong kong":                 "port474",
+    "qingdao":                   "port1069",
+    "tianjin":                   "port1297",
+    "tianjin xin gang":          "port1297",
+    "rotterdam":                 "port1114",
+    "jebel ali":                 "port306",
+    "dubai":                     "port306",
+    "hamburg":                   "port446",
+    "new york":                  "port815",
+    "new york-new jersey":       "port815",
+    "los angeles":               "port664",
+    "los angeles-long beach":    "port664",
+    "tanjung pelepas":           "port1269",
+    "colombo":                   "port254",
+    "port said":                 "port192",
+    "antwerp":                   "port57",
+    "felixstowe":                "port343",
+    "yokohama":                  "port1417",
+    "karachi":                   "port543",
+}
+
+CALIB_PATH = os.path.join(_ROOT, "calibration.json")
+
+# Singleton — load once
+_model: "SimulationModel | None" = None
+
+
+def _get_model() -> "SimulationModel | None":
+    global _model
+    if not _SIM_AVAILABLE:
+        return None
+    if _model is None:
+        if not os.path.exists(CALIB_PATH):
+            logger.error("calibration.json not found at %s", CALIB_PATH)
+            return None
+        _model = SimulationModel()
+        _model.load_calibration(CALIB_PATH)
+        logger.info("SimulationModel loaded from %s", CALIB_PATH)
+    return _model
+
+
+def _resolve_port_id(port_name: str) -> str:
+    """Convert port name string to portid. Returns best guess or default."""
+    return PORT_NAME_TO_ID.get(port_name.strip().lower(), "port776")
+
+
 def should_trigger(prediction: PredictionResponse, threshold: float) -> bool:
-    # The threshold used here is derived from model evaluation and directly determines whether the simulation engine is triggered.
     return prediction.congestion_probability > threshold
 
 
-def simulate(prediction: PredictionResponse, input_data: Dict[str, Union[float, str]]) -> SimulationResponse:
-    logger.info("Starting simulation based on prediction and input data.")
+def simulate(
+    prediction: PredictionResponse,
+    input_data: Dict[str, Union[float, str]],
+) -> SimulationResponse:
+    logger.info("Starting simulation.")
 
-    rainfall = float(input_data.get("rainfall", 0.0))
-    disruption_severity = float(input_data.get("disruption_severity", 0.0))
-    base_queue = float(input_data.get("current_queue", 10.0))
+    # ── Extract route info from input_data ───────────────────────
+    # Support both "origin_port" (API input) and "port_name" (legacy)
+    origin_name = str(
+        input_data.get("origin_port") or
+        input_data.get("port_name") or
+        "JNPT"
+    )
+    dest_name   = str(input_data.get("destination_port", "Singapore"))
+    cargo_type  = str(input_data.get("cargo_type",       "container")).lower()
+    volume      = float(input_data.get("cargo_volume_teu", 300.0))
+    season      = str(input_data.get("season",           "summer")).lower()
+    n_runs      = int(input_data.get("sim_runs",          1000))
 
-    # Simple capacity reduction model influenced by rainfall and disruption severity.
-    capacity_reduction = min(0.9, 0.1 + (rainfall * 0.05) + (disruption_severity * 0.3))
+    logger.info("Simulation route: %s → %s | cargo: %s | volume: %.0f TEU",
+                origin_name, dest_name, cargo_type, volume)
 
-    # Queue buildup reflects reduced throughput and higher congestion probability.
-    queue_size = base_queue * (1.0 + capacity_reduction + prediction.congestion_probability)
+    origin_id = _resolve_port_id(origin_name)
+    dest_id   = _resolve_port_id(dest_name)
 
-    # Delay increases with queue size and capacity reduction.
-    estimated_delay_hours = max(0.0, queue_size * 0.2 + capacity_reduction * 5.0)
+    logger.info("Resolved port IDs: %s → %s", origin_id, dest_id)
 
-    congestion_level = "HIGH" if prediction.congestion_probability > 0.8 else "MEDIUM"
+    # Same port guard
+    if origin_id == dest_id:
+        dest_id = "port1201"   # default to Singapore
+        logger.warning("Origin and destination resolved to same port — defaulting dest to Singapore")
+
+    # Risk score from prediction model — keyed by origin portid
+    risk_scores = {origin_id: float(prediction.congestion_probability)}
+
+    # ── Run real simulation if available ─────────────────────────
+    model = _get_model()
+
+    if model is not None:
+        try:
+            result = model.run(
+                origin_port_id      = origin_id,
+                destination_port_id = dest_id,
+                cargo_type          = cargo_type,
+                cargo_volume_teu    = volume,
+                risk_scores         = risk_scores,
+                season              = season,
+                n_runs              = n_runs,
+            )
+
+            # Map SimulationOutput → SimulationResponse
+            congestion_level = (
+                "HIGH"   if result.delay_p90 > 24
+                else "MEDIUM" if result.delay_p50 > 8
+                else "LOW"
+            )
+
+            logger.info(
+                "SimulationModel succeeded: delay_p50=%.1f delay_p90=%.1f prob_disruption=%.2f",
+                result.delay_p50, result.delay_p90, result.prob_any_disruption,
+            )
+
+            return SimulationResponse(
+                estimated_delay_hours = result.delay_p50,
+                delay_p75             = result.delay_p75,
+                delay_p90             = result.delay_p90,
+                delay_p95             = result.delay_p95,
+                prob_disruption       = result.prob_any_disruption,
+                prob_missed_sla       = result.prob_missed_sla,
+                queue_size            = float(result.delay_mean),
+                congestion_level      = congestion_level,
+                disruption_breakdown  = result.disruption_breakdown,
+                cascade_risk          = result.cascade_risk,
+                origin_port           = origin_name,
+                destination_port      = dest_name,
+            )
+
+        except Exception as e:
+            logger.error(
+                "SimulationModel.run() failed: %s\n%s",
+                e, traceback.format_exc()
+            )
+
+    # ── Fallback placeholder (keeps API alive if model missing) ──
+    logger.warning("Using placeholder simulation for %s → %s", origin_name, dest_name)
+    rainfall       = float(input_data.get("rainfall_mm",              0.0))
+    disruption_sev = float(input_data.get("weather_forecast_severity", 0.0))
+    base_queue     = float(input_data.get("current_queue",            10.0))
+    cap_reduction  = min(0.9, 0.1 + rainfall * 0.05 + disruption_sev * 0.3)
+    queue_size     = base_queue * (1.0 + cap_reduction + prediction.congestion_probability)
+    est_delay      = max(0.0, queue_size * 0.2 + cap_reduction * 5.0)
+    congestion_level = (
+        "HIGH"   if prediction.congestion_probability > 0.8
+        else "MEDIUM" if prediction.congestion_probability > 0.5
+        else "LOW"
+    )
 
     return SimulationResponse(
-        estimated_delay_hours=estimated_delay_hours,
-        queue_size=queue_size,
-        congestion_level=congestion_level,
+        estimated_delay_hours = est_delay,
+        delay_p75             = est_delay * 1.4,
+        delay_p90             = est_delay * 1.8,
+        delay_p95             = est_delay * 2.2,
+        prob_disruption       = prediction.congestion_probability,
+        prob_missed_sla       = prediction.congestion_probability * 0.6,
+        queue_size            = queue_size,
+        congestion_level      = congestion_level,
+        disruption_breakdown  = {},
+        cascade_risk          = {},
+        origin_port           = origin_name,
+        destination_port      = dest_name,
     )
