@@ -1,0 +1,18 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files first for layer caching
+COPY package.json package-lock.json* ./
+
+# Install only production dependencies
+RUN npm install --omit=dev
+
+# Copy backend JS files
+COPY backend/index.js ./
+COPY backend/query_db.js ./
+# serviceAccountKey.json is mounted as a volume at runtime (keep secrets out of image)
+
+EXPOSE 5000
+
+CMD ["node", "index.js"]
