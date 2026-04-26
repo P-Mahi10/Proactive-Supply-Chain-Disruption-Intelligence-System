@@ -1,7 +1,7 @@
 from typing import Dict, Optional, Union
 
 from app.schemas.response_schema import PipelineResponse, PredictionResponse, SimulationResponse
-from app.services import prediction_service, simulation_service, solution_service
+from app.services import firebase_service, prediction_service, simulation_service, solution_service
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -22,6 +22,10 @@ def _maybe_simulate(
 
 def run_pipeline(input_data: Dict[str, Union[float, str]]) -> PipelineResponse:
     logger.info("Running pipeline orchestration.")
+    
+    # Save input data to Firebase
+    firebase_service.save_pipeline_input(input_data)
+    
     prediction = prediction_service.predict(input_data)
     threshold = prediction_service.get_threshold()
     simulation = _maybe_simulate(prediction, input_data, threshold)
