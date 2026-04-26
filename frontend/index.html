@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proactive Supply Chain Intelligence</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="background-mesh"></div>
+    
+    <div class="app-container">
+        <header class="glass-header">
+            <div class="logo">
+                <i class="fa-solid fa-earth-americas"></i>
+                <h1>Nexus Supply Chain Intelligence</h1>
+            </div>
+            <div class="status-indicator">
+                <span class="pulse"></span> System Online
+            </div>
+        </header>
+
+        <main class="dashboard-grid">
+            <!-- Left Side: Input Form -->
+            <section class="glass-panel form-section">
+                <h2><i class="fa-solid fa-sliders"></i> Metrics Input</h2>
+                <form id="pipeline-form">
+                    <div class="form-grid">
+                        <div class="input-group">
+                            <label for="port_name">Port Name</label>
+                            <input type="text" id="port_name" name="port_name" value="Busan" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="portcalls">Daily Portcalls</label>
+                            <input type="number" id="portcalls" name="portcalls" value="59" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="cargo_volume_teu">Cargo Volume (TEU)</label>
+                            <input type="number" id="cargo_volume_teu" name="cargo_volume_teu" value="378138" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="rainfall_mm">Rainfall (mm)</label>
+                            <input type="number" id="rainfall_mm" name="rainfall_mm" value="7.1" step="0.1" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="wind_speed_kmh">Wind Speed (km/h)</label>
+                            <input type="number" id="wind_speed_kmh" name="wind_speed_kmh" value="12.3" step="0.1" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="disruption_flag">Active Disruption Flag</label>
+                            <input type="number" id="disruption_flag" name="disruption_flag" value="0" min="0" max="1" required>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="primary-btn" id="analyze-btn">
+                        <span>Run Intelligence Pipeline</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </form>
+            </section>
+
+            <!-- Right Side: Results -->
+            <section class="results-section">
+                
+                <!-- Loading State -->
+                <div class="glass-panel loading-state hidden" id="loading-spinner">
+                    <div class="spinner"></div>
+                    <p>Analyzing global metrics...</p>
+                </div>
+
+                <!-- Prediction Card -->
+                <div class="glass-panel result-card hidden" id="prediction-card">
+                    <div class="card-header">
+                        <h3><i class="fa-solid fa-chart-line"></i> Risk Prediction</h3>
+                        <span class="badge" id="risk-badge">HIGH</span>
+                    </div>
+                    <div class="metric-row">
+                        <div class="metric-block">
+                            <span class="label">Congestion Probability</span>
+                            <span class="value" id="prob-val">0%</span>
+                        </div>
+                        <div class="metric-block">
+                            <span class="label">Predicted Occupancy (t+2)</span>
+                            <span class="value" id="occ-val">0%</span>
+                        </div>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" id="prob-bar"></div>
+                    </div>
+                </div>
+
+                <!-- Simulation Card -->
+                <div class="glass-panel result-card hidden" id="simulation-card">
+                    <div class="card-header">
+                        <h3><i class="fa-solid fa-clock"></i> Disruption Simulation</h3>
+                    </div>
+                    <div class="metric-row">
+                        <div class="metric-block">
+                            <span class="label">Estimated Delay</span>
+                            <span class="value" id="delay-val">0 hrs</span>
+                        </div>
+                        <div class="metric-block">
+                            <span class="label">Queue Size</span>
+                            <span class="value" id="queue-val">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recommendation Card -->
+                <div class="glass-panel result-card hidden" id="recommendation-card">
+                    <div class="card-header">
+                        <h3><i class="fa-solid fa-route"></i> Optimal Rerouting Alternatives</h3>
+                    </div>
+                    <div class="routes-list" id="routes-container">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+            </section>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
