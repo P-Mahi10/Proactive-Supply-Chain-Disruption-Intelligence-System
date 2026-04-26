@@ -16,7 +16,13 @@ def predict(input_data: Dict[str, Union[float, str]]) -> PredictionResponse:
     model_columns = model_loader.load_columns()
     threshold = model_loader.load_threshold()
 
-    input_frame = pd.DataFrame([input_data])
+    prediction_input = dict(input_data)
+    prediction_input["port_name"] = prediction_input.get("origin_port", "Unknown")
+    # Remove non-model fields so they don't confuse reindex
+    prediction_input.pop("origin_port", None)
+    prediction_input.pop("destination_port", None)
+
+    input_frame = pd.DataFrame([prediction_input])
     input_frame = pd.get_dummies(input_frame, columns=["port_name"], drop_first=False)
     aligned_frame = input_frame.reindex(columns=model_columns, fill_value=0)
 

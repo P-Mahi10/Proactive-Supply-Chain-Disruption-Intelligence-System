@@ -5,9 +5,17 @@ from pathlib import Path
 import psycopg2
 from dotenv import load_dotenv
 
-from app.schemas.response_schema import RecommendationItem
+import requests
+from dotenv import load_dotenv
+
+from app.schemas.response_schema import (
+    PredictionResponse,
+    RecommendationItem,
+    SimulationResponse,
+)
 from app.utils.logger import get_logger
 
+load_dotenv()
 logger = get_logger(__name__)
 
 backend_dir = Path(__file__).resolve().parent.parent.parent

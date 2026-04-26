@@ -1,0 +1,35 @@
+services:
+  api:
+    build:
+      context: .          # project root — Dockerfile lives here
+      dockerfile: Dockerfile
+    image: cargo-pipeline:latest
+    container_name: cargo_pipeline_api
+    ports:
+      - "8000:8000"
+
+    # ── Secrets / config ────────────────────────────────────────────────────
+    # Option A (recommended for dev): use an .env file at project root.
+    env_file:
+      - .env
+
+    # Option B: hard-code non-secret vars here and inject the key from your
+    # shell: OPENROUTER_API_KEY=sk-... docker compose up
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}   # falls back to .env value
+
+    # ── Model artefacts ─────────────────────────────────────────────────────
+    # Mount the data directory so you can swap .pkl files without rebuilding.
+    volumes:
+      - ./backend/data:/app/backend/data:ro
+
+    # ── Health check ────────────────────────────────────────────────────────
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+    restart: unless-stopped
