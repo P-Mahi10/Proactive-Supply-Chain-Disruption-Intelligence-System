@@ -23,9 +23,6 @@ def _maybe_simulate(
 def run_pipeline(input_data: Dict[str, Union[float, str]]) -> PipelineResponse:
     logger.info("Running pipeline orchestration.")
     
-    # Save input data to Firebase
-    firebase_service.save_pipeline_input(input_data)
-    
     prediction = prediction_service.predict(input_data)
     threshold = prediction_service.get_threshold()
     simulation = _maybe_simulate(prediction, input_data, threshold)
@@ -35,8 +32,13 @@ def run_pipeline(input_data: Dict[str, Union[float, str]]) -> PipelineResponse:
         recommendation = solution_service.get_recommendations(input_data)
         logger.info("Recommendations generated.")
 
-    return PipelineResponse(
+    response = PipelineResponse(
         prediction=prediction,
         simulation=simulation,
         recommendation=recommendation,
     )
+    
+    # Save output data to Firebase
+    firebase_service.save_pipeline_run(response.model_dump())
+    
+    return response

@@ -31,9 +31,9 @@ except Exception as e:
     logger.error(f"Failed to initialize Firebase: {e}")
 
 
-def save_pipeline_input(input_data: Dict[str, Union[float, str]]) -> str:
+def save_pipeline_run(output_data: dict) -> str:
     """
-    Saves the prediction input data to Firebase Firestore.
+    Saves the prediction resulting output to Firebase Firestore.
     Returns the document ID.
     """
     if db is None:
@@ -41,13 +41,13 @@ def save_pipeline_input(input_data: Dict[str, Union[float, str]]) -> str:
         return ""
 
     try:
-        doc_ref = db.collection("pipeline_inputs").document(str(uuid.uuid4()))
+        doc_ref = db.collection("pipeline_runs").document(str(uuid.uuid4()))
         doc_ref.set({
-            "input_data": input_data,
+            "output_data": output_data,
             "timestamp": datetime.utcnow()
         })
-        logger.info(f"Successfully saved input data to Firebase with ID: {doc_ref.id}")
+        logger.info(f"Successfully saved pipeline run to Firebase with ID: {doc_ref.id}")
         return doc_ref.id
     except Exception as e:
-        logger.error(f"Failed to save input data to Firebase: {e}")
+        logger.error(f"Failed to save pipeline run to Firebase: {e}")
         return ""
