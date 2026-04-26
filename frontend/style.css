@@ -1,14 +1,14 @@
 :root {
-    --bg-dark: #07090f;
-    --glass-bg: rgba(255, 255, 255, 0.03);
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --text-main: #f0f4f8;
-    --text-muted: #94a3b8;
-    --accent-cyan: #00f3ff;
-    --accent-purple: #8a2be2;
-    --risk-high: #ff3b3b;
-    --risk-low: #00e676;
-    --risk-medium: #ffaa00;
+    --bg-light: #f4f7fb;
+    --glass-bg: rgba(255, 255, 255, 0.75);
+    --glass-border: rgba(0, 0, 0, 0.1);
+    --text-main: #1e293b;
+    --text-muted: #64748b;
+    --accent-cyan: #0284c7;
+    --accent-purple: #7c3aed;
+    --risk-high: #dc2626;
+    --risk-low: #16a34a;
+    --risk-medium: #d97706;
 }
 
 * {
@@ -19,7 +19,7 @@
 }
 
 body {
-    background-color: var(--bg-dark);
+    background-color: var(--bg-light);
     color: var(--text-main);
     min-height: 100vh;
     overflow-x: hidden;
@@ -29,8 +29,8 @@ body {
 .background-mesh {
     position: fixed;
     top: 0; left: 0; width: 100vw; height: 100vh;
-    background: radial-gradient(circle at 15% 50%, rgba(0, 243, 255, 0.1), transparent 50%),
-                radial-gradient(circle at 85% 30%, rgba(138, 43, 226, 0.15), transparent 50%);
+    background: radial-gradient(circle at 15% 50%, rgba(2, 132, 199, 0.1), transparent 50%),
+                radial-gradient(circle at 85% 30%, rgba(124, 58, 237, 0.15), transparent 50%);
     z-index: -1;
     animation: pulseBg 15s ease-in-out infinite alternate;
 }
@@ -53,7 +53,7 @@ body {
     -webkit-backdrop-filter: blur(16px);
     border: 1px solid var(--glass-border);
     border-radius: 24px;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
 }
 
 .glass-header {
@@ -71,7 +71,7 @@ body {
     font-size: 1.2rem;
     font-weight: 800;
     letter-spacing: 1px;
-    color: #fff;
+    color: var(--text-main);
 }
 
 .logo i {
@@ -149,11 +149,11 @@ label {
 }
 
 input {
-    background: rgba(0, 0, 0, 0.2);
+    background: rgba(255, 255, 255, 0.5);
     border: 1px solid var(--glass-border);
     padding: 0.8rem 1rem;
     border-radius: 8px;
-    color: #fff;
+    color: var(--text-main);
     font-size: 1rem;
     transition: all 0.3s ease;
     font-family: 'Outfit', sans-serif;
@@ -162,7 +162,7 @@ input {
 input:focus {
     outline: none;
     border-color: var(--accent-cyan);
-    box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
+    box-shadow: 0 0 10px rgba(2, 132, 199, 0.2);
 }
 
 .primary-btn {
@@ -186,7 +186,7 @@ input:focus {
 
 .primary-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 20px rgba(138, 43, 226, 0.3);
+    box-shadow: 0 10px 20px rgba(124, 58, 237, 0.3);
 }
 
 /* Results Section */
@@ -260,13 +260,13 @@ h3 i { color: var(--accent-cyan); }
 .metric-block .value {
     font-size: 2rem;
     font-weight: 800;
-    color: #fff;
+    color: var(--text-main);
 }
 
 .progress-bar-container {
     width: 100%;
     height: 6px;
-    background: rgba(255,255,255,0.1);
+    background: rgba(0,0,0,0.1);
     border-radius: 3px;
     overflow: hidden;
 }
@@ -289,7 +289,7 @@ h3 i { color: var(--accent-cyan); }
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(0, 0, 0, 0.2);
+    background: rgba(255, 255, 255, 0.5);
     padding: 1rem 1.5rem;
     border-radius: 12px;
     border: 1px solid var(--glass-border);
@@ -297,8 +297,8 @@ h3 i { color: var(--accent-cyan); }
 }
 
 .route-item:hover {
-    background: rgba(0, 243, 255, 0.05);
-    border-color: rgba(0, 243, 255, 0.3);
+    background: rgba(2, 132, 199, 0.05);
+    border-color: rgba(2, 132, 199, 0.3);
     transform: translateX(5px);
 }
 
@@ -315,7 +315,7 @@ h3 i { color: var(--accent-cyan); }
 }
 
 .route-metrics span strong {
-    color: #fff;
+    color: var(--text-main);
 }
 
 /* Loading */
@@ -331,7 +331,7 @@ h3 i { color: var(--accent-cyan); }
 .spinner {
     width: 50px;
     height: 50px;
-    border: 3px solid rgba(255,255,255,0.1);
+    border: 3px solid rgba(0,0,0,0.1);
     border-radius: 50%;
     border-top-color: var(--accent-cyan);
     animation: spin 1s ease-in-out infinite;
