@@ -17,7 +17,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 app.include_router(router)
+
+
+@app.get("/")
+def root():
+    return {
+        "status": "running",
+        "service": "Proactive Supply Chain Disruption Intelligence System",
+        "docs": "/docs"
+    }
 
 
 @app.on_event("startup")

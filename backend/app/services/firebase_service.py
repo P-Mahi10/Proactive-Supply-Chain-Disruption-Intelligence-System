@@ -14,19 +14,28 @@ logger = get_logger(__name__)
 
 # Initialize Firebase
 backend_dir = Path(__file__).resolve().parent.parent.parent
-service_account_path = backend_dir.parent / "serviceAccountKey.json"
+env_service_account_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT_PATH")
+candidate_paths = []
+
+if env_service_account_path:
+    candidate_paths.append(Path(env_service_account_path))
+
+candidate_paths.append(Path("/etc/secrets/serviceAccount"))
+candidate_paths.append(backend_dir.parent / "serviceAccount")
+
+service_account_path = next((path for path in candidate_paths if path.exists()), None)
 
 db = None
 
 try:
-    if service_account_path.exists():
+    if service_account_path is not None:
         cred = credentials.Certificate(str(service_account_path))
         if not firebase_admin._apps:
             firebase_admin.initialize_app(cred)
         db = firestore.client()
         logger.info("Firebase initialized successfully.")
     else:
-        logger.warning(f"Firebase credentials not found at {service_account_path}. Input saving will be skipped.")
+        logger.warning("Firebase credentials not found. Input saving will be skipped.")
 except Exception as e:
     logger.error(f"Failed to initialize Firebase: {e}")
 

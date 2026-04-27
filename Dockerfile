@@ -47,5 +47,5 @@ USER appuser
 # which mirrors running `uvicorn app.main:app` from inside backend/.
 CMD ["uvicorn", "app.main:app", \
      "--host", "0.0.0.0", \
-     "--port", "8000", \
+     "--port", "8080", \
      "--workers", "1"]

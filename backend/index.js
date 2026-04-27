@@ -1,6 +1,8 @@
 import express from "express";
 import pkg from "pg";
 import admin from "firebase-admin";
+import fs from "fs";
+import path from "path";
 import cors from "cors";
 import dotenv from "dotenv";
 
@@ -16,13 +18,28 @@ const pool = new Pool({
 });
 
 /* Firebase */
-import serviceAccount from "./serviceAccountKey.json" assert { type: "json" };
+const envServiceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
+const secretsPath = "/etc/secrets/serviceAccount";
+const rootPath = path.join(process.cwd(), "serviceAccount");
+const serviceAccountPath = envServiceAccountPath || secretsPath;
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+let firestore = null;
 
-const firestore = admin.firestore();
+try {
+  const resolvedPath = fs.existsSync(serviceAccountPath)
+    ? serviceAccountPath
+    : rootPath;
+
+  const serviceAccount = JSON.parse(fs.readFileSync(resolvedPath, "utf8"));
+
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+
+  firestore = admin.firestore();
+} catch (error) {
+  console.warn("Firebase credentials not found. Chat saving will be skipped.");
+}
 
 /* TEST ROUTE */
 app.get("/", (req, res) => {
@@ -49,6 +66,10 @@ app.get("/routes", async (req, res) => {
 /* SAVE CHAT */
 app.post("/chat", async (req, res) => {
   const { conversationId, message } = req.body;
+
+  if (!firestore) {
+    return res.status(503).send("Firebase not initialized");
+  }
 
   await firestore
     .collection("ai_conversations")
