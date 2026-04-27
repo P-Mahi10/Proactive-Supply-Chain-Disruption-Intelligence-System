@@ -6,7 +6,6 @@ from datetime import datetime
 
 import firebase_admin
 from firebase_admin import credentials, firestore
-from dotenv import load_dotenv
 
 from app.utils.logger import get_logger
 
@@ -15,27 +14,39 @@ logger = get_logger(__name__)
 # Initialize Firebase
 backend_dir = Path(__file__).resolve().parent.parent.parent
 env_service_account_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT_PATH")
+
 candidate_paths = []
 
+# 1. Env variable path (if provided)
 if env_service_account_path:
     candidate_paths.append(Path(env_service_account_path))
 
-candidate_paths.append(Path("/etc/secrets/serviceAccount"))
-candidate_paths.append(backend_dir.parent / "serviceAccount")
+# 2. Render secret file path
+candidate_paths.append(Path("/etc/secrets/serviceAccountKey.json"))
 
+# 3. Local development paths
+candidate_paths.append(backend_dir / "serviceAccountKey.json")
+candidate_paths.append(backend_dir.parent / "serviceAccountKey.json")
+
+# Resolve first valid path
 service_account_path = next((path for path in candidate_paths if path.exists()), None)
 
 db = None
 
 try:
     if service_account_path is not None:
+        logger.info(f"Using Firebase credentials from: {service_account_path}")
+
         cred = credentials.Certificate(str(service_account_path))
+
         if not firebase_admin._apps:
             firebase_admin.initialize_app(cred)
+
         db = firestore.client()
         logger.info("Firebase initialized successfully.")
     else:
         logger.warning("Firebase credentials not found. Input saving will be skipped.")
+
 except Exception as e:
     logger.error(f"Failed to initialize Firebase: {e}")
 
@@ -55,8 +66,10 @@ def save_pipeline_run(output_data: dict) -> str:
             "output_data": output_data,
             "timestamp": datetime.utcnow()
         })
+
         logger.info(f"Successfully saved pipeline run to Firebase with ID: {doc_ref.id}")
         return doc_ref.id
+
     except Exception as e:
         logger.error(f"Failed to save pipeline run to Firebase: {e}")
         return ""
