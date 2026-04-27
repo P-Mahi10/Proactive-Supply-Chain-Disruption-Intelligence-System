@@ -11,14 +11,48 @@
 <body>
     <div class="background-mesh"></div>
     
-    <div class="app-container">
+    <!-- Auth Container -->
+    <div id="auth-container" class="auth-wrapper">
+        <div class="glass-panel auth-panel">
+            <h2 id="auth-title">Welcome Back</h2>
+            <form id="login-form">
+                <div class="input-group">
+                    <label for="auth-email">Email</label>
+                    <input type="email" id="auth-email" required>
+                </div>
+                <div class="input-group">
+                    <label for="auth-password">Password</label>
+                    <input type="password" id="auth-password" required>
+                </div>
+                <div id="auth-error" class="auth-error hidden"></div>
+                <button type="submit" id="auth-submit-btn" class="primary-btn auth-btn">Log In</button>
+            </form>
+            <div class="auth-divider">
+                <span>OR</span>
+            </div>
+            <button id="google-login-btn" class="secondary-btn auth-btn">
+                <i class="fa-brands fa-google"></i> Sign in with Google
+            </button>
+            <div class="auth-footer">
+                <a href="#" id="toggle-signup">Need an account? Sign Up</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="main-app-container" class="app-container hidden">
         <header class="glass-header">
             <div class="logo">
                 <i class="fa-solid fa-earth-americas"></i>
                 <h1>Nexus Supply Chain Intelligence</h1>
             </div>
-            <div class="status-indicator">
-                <span class="pulse"></span> System Online
+            <div class="header-right">
+                <div class="status-indicator">
+                    <span class="pulse"></span> System Online
+                </div>
+                <button id="sign-out-btn" class="icon-btn" title="Sign Out">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </button>
             </div>
         </header>
 
@@ -122,6 +156,7 @@
         </main>
     </div>
 
+    <script type="module" src="auth.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

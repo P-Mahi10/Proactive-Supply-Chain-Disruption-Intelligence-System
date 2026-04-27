@@ -15,6 +15,7 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
     volumes:
       - ./backend/data:/app/backend/data:ro
+      - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
     healthcheck:
       test: ["CMD", "python", "-c",
              "import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')"]

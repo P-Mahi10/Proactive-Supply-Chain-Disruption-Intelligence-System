@@ -45,11 +45,17 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            
+            if (window.firebaseAuthToken) {
+                headers['Authorization'] = `Bearer ${window.firebaseAuthToken}`;
+            }
+            
             const response = await fetch('http://localhost:8000/run_pipeline', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: headers,
                 body: JSON.stringify(payload)
             });
 

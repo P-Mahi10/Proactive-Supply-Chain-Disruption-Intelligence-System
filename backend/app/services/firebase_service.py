@@ -14,7 +14,7 @@ logger = get_logger(__name__)
 
 # Initialize Firebase
 backend_dir = Path(__file__).resolve().parent.parent.parent
-service_account_path = backend_dir / "serviceAccountKey.json"
+service_account_path = backend_dir.parent / "serviceAccountKey.json"
 
 db = None
 
@@ -22,7 +22,7 @@ try:
     if service_account_path.exists():
         cred = credentials.Certificate(str(service_account_path))
         if not firebase_admin._apps:
-            firebase_admin.initializeApp(cred)
+            firebase_admin.initialize_app(cred)
         db = firestore.client()
         logger.info("Firebase initialized successfully.")
     else:
