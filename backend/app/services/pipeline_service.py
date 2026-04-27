@@ -6,12 +6,8 @@ Orchestrates: predict → simulate → LLM recommendations.
 
 from typing import Dict, Optional, Union
 
-from app.schemas.response_schema import (
-    PipelineResponse,
-    PredictionResponse,
-    SimulationResponse,
-)
-from app.services import prediction_service, simulation_service, solution_service
+from app.schemas.response_schema import PipelineResponse, PredictionResponse, SimulationResponse
+from app.services import firebase_service, prediction_service, simulation_service, solution_service
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -33,8 +29,7 @@ def run_pipeline(
     input_data: Dict[str, Union[float, str]],
 ) -> PipelineResponse:
     logger.info("Running pipeline orchestration.")
-
-    # ── Step 1: Prediction ────────────────────────────────────────
+    
     prediction = prediction_service.predict(input_data)
     threshold  = prediction_service.get_threshold()
     logger.info(
@@ -64,9 +59,13 @@ def run_pipeline(
     else:
         logger.info("LLM step skipped — simulation not triggered.")
 
-    return PipelineResponse(
-        prediction     = prediction,
-        simulation     = simulation,
-        recommendation = recommendation,
-        advisory       = advisory,
+    response = PipelineResponse(
+        prediction=prediction,
+        simulation=simulation,
+        recommendation=recommendation,
     )
+    
+    # Save output data to Firebase
+    firebase_service.save_pipeline_run(response.model_dump())
+    
+    return response

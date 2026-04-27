@@ -1,6 +1,8 @@
 from typing import List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+
+from app.api.auth import verify_token
 
 from app.schemas.request_schema import InputRequest
 from app.schemas.response_schema import PipelineResponse, PredictionResponse, RecommendationItem, SimulationResponse
@@ -12,7 +14,7 @@ router = APIRouter()
 
 
 @router.post("/predict", response_model=PredictionResponse)
-def predict(request: InputRequest) -> PredictionResponse:
+def predict(request: InputRequest, user: dict = Depends(verify_token)) -> PredictionResponse:
     logger.info("Request received: /predict")
     prediction = prediction_service.predict(request.input_data)
     logger.info("Prediction output: %s", prediction.model_dump())
@@ -20,7 +22,7 @@ def predict(request: InputRequest) -> PredictionResponse:
 
 
 @router.post("/simulate", response_model=SimulationResponse)
-def simulate(request: InputRequest) -> SimulationResponse:
+def simulate(request: InputRequest, user: dict = Depends(verify_token)) -> SimulationResponse:
     logger.info("Request received: /simulate")
     prediction = prediction_service.predict(request.input_data)
 
@@ -35,7 +37,7 @@ def simulate(request: InputRequest) -> SimulationResponse:
 
 
 @router.post("/recommend", response_model=List[RecommendationItem])
-def recommend(request: InputRequest) -> List[RecommendationItem]:
+def recommend(request: InputRequest, user: dict = Depends(verify_token)) -> List[RecommendationItem]:
     logger.info("Request received: /recommend")
     recommendations = solution_service.get_recommendations(request.input_data)
     logger.info("Recommendation output count: %d", len(recommendations))
@@ -43,7 +45,7 @@ def recommend(request: InputRequest) -> List[RecommendationItem]:
 
 
 @router.post("/run_pipeline", response_model=PipelineResponse)
-def run_pipeline(request: InputRequest) -> PipelineResponse:
+def run_pipeline(request: InputRequest, user: dict = Depends(verify_token)) -> PipelineResponse:
     logger.info("Request received: /run_pipeline")
     response = pipeline_service.run_pipeline(request.input_data)
     logger.info("Pipeline response assembled.")

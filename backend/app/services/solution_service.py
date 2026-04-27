@@ -1,19 +1,22 @@
 """
 backend/app/services/solution_service.py
 =========================================
-Sends simulation output to Gemma via OpenRouter and returns
-structured recommendations + plain-English advisory.
+Handles two separate recommendation flows:
 
-Requires OPENROUTER_API_KEY in environment (or .env file).
+1. get_recommendations()     — called by /recommend endpoint
+                               queries PostgreSQL for route options
 
-Model: google/gemma-3-27b-it:free  (falls back to gemma-3-12b-it:free)
+2. get_llm_recommendations() — called by pipeline_service after simulation
+                               calls Gemma via OpenRouter for advisory + recs
 """
 
 import json
 import os
 import re
+from pathlib import Path
 from typing import Dict, List, Union
 
+import psycopg2
 import requests
 from dotenv import load_dotenv
 
@@ -27,10 +30,13 @@ from app.utils.logger import get_logger
 load_dotenv()
 logger = get_logger(__name__)
 
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+backend_dir = Path(__file__).resolve().parent.parent.parent
+load_dotenv(backend_dir / ".env")
+
+DATABASE_URL       = os.environ.get("DATABASE_URL")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_URL     = "https://openrouter.ai/api/v1/chat/completions"
 
-# Model preference order — all free tier
 MODELS = [
     "google/gemma-3-27b-it:free",
     "google/gemma-3-12b-it:free",
@@ -39,27 +45,78 @@ MODELS = [
 
 
 # ─────────────────────────────────────────────────────────────────
-# PROMPT BUILDER
+# /recommend endpoint — PostgreSQL route lookup
+# ─────────────────────────────────────────────────────────────────
+
+def get_recommendations(
+    input_data: Dict[str, Union[float, str]],
+) -> List[RecommendationItem]:
+    logger.info("Fetching recommendations from PostgreSQL.")
+
+    if not DATABASE_URL:
+        logger.warning("DATABASE_URL not set — returning mock data.")
+        return _get_mock_recommendations()
+
+    try:
+        conn   = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT r.origin, r.destination, tm.name AS route,
+                   rm.cost_per_unit AS cost, rm.estimated_time_hours AS delay_factor
+            FROM route_metrics rm
+            JOIN route_options ro ON rm.route_option_id = ro.id
+            JOIN routes r        ON ro.route_id         = r.id
+            JOIN transport_modes tm ON ro.transport_mode_id = tm.id
+            WHERE rm.condition_type = 'current'
+            ORDER BY rm.cost_per_unit ASC
+            LIMIT 4;
+        """)
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        items = []
+        for row in rows:
+            route_val = str(row[2]).title() if row[2] else "Unknown"
+            if route_val == "Air":
+                route_val = "Air Freight"
+            items.append(RecommendationItem(
+                route        = route_val,
+                cost         = float(row[3]),
+                delay_factor = float(row[4]),
+            ))
+
+        return items if items else _get_mock_recommendations()
+
+    except Exception as e:
+        logger.error("DB query failed: %s", e)
+        return _get_mock_recommendations()
+
+
+def _get_mock_recommendations() -> List[RecommendationItem]:
+    return [
+        RecommendationItem(route="Route A",      cost=100.0, delay_factor=0.8),
+        RecommendationItem(route="Route B",      cost=120.0, delay_factor=0.6),
+        RecommendationItem(route="Air Freight",  cost=300.0, delay_factor=0.4),
+        RecommendationItem(route="Rail",         cost=150.0, delay_factor=0.7),
+    ]
+
+
+# ─────────────────────────────────────────────────────────────────
+# /run_pipeline — LLM advisory via OpenRouter
 # ─────────────────────────────────────────────────────────────────
 
 def _build_prompt(
-    prediction:  PredictionResponse,
-    simulation:  SimulationResponse,
-    input_data:  Dict[str, Union[float, str]],
+    prediction: PredictionResponse,
+    simulation: SimulationResponse,
+    input_data: Dict[str, Union[float, str]],
 ) -> str:
-    """
-    Build a tight, structured prompt for the LLM.
-    Keeps token count low — Gemma free tier has context limits.
-    All simulation field access uses getattr with defaults for safety.
-    """
-    # Input context — support both origin_port and port_name keys
     port   = input_data.get("origin_port") or input_data.get("port_name") or "unknown port"
     dest   = input_data.get("destination_port", "destination")
-    cargo  = input_data.get("cargo_type",        "cargo")
-    volume = input_data.get("cargo_volume_teu",  "unknown")
-    season = input_data.get("season",            "unknown")
+    cargo  = input_data.get("cargo_type",       "cargo")
+    volume = input_data.get("cargo_volume_teu", "unknown")
+    season = input_data.get("season",           "unknown")
 
-    # Safe simulation field access
     estimated_delay  = getattr(simulation, "estimated_delay_hours", 0.0)
     delay_p75        = getattr(simulation, "delay_p75",             0.0)
     delay_p90        = getattr(simulation, "delay_p90",             0.0)
@@ -68,19 +125,17 @@ def _build_prompt(
     prob_missed_sla  = getattr(simulation, "prob_missed_sla",       0.0)
     congestion_level = getattr(simulation, "congestion_level",      "UNKNOWN")
 
-    # Top cascade ports (max 4 for brevity)
     cascade_str  = "none"
     cascade_risk = getattr(simulation, "cascade_risk", None) or {}
     if cascade_risk:
         top = sorted(cascade_risk.items(), key=lambda x: -x[1])[:4]
         cascade_str = ", ".join(f"{pid} ({v*100:.0f}%)" for pid, v in top)
 
-    # Top disruption type
     disruption_breakdown = getattr(simulation, "disruption_breakdown", None) or {}
-    breakdown     = {k: v for k, v in disruption_breakdown.items() if k != "none"}
-    top_disruption = max(breakdown, key=breakdown.get) if breakdown else "unknown"
+    breakdown            = {k: v for k, v in disruption_breakdown.items() if k != "none"}
+    top_disruption       = max(breakdown, key=breakdown.get) if breakdown else "unknown"
 
-    prompt = f"""You are a supply chain risk advisor for a logistics company.
+    return f"""You are a supply chain risk advisor for a logistics company.
 Analyze the following disruption intelligence report and provide actionable recommendations.
 
 === SHIPMENT CONTEXT ===
@@ -117,28 +172,14 @@ Return a JSON object with exactly this structure (no markdown, no extra text):
   ]
 }}
 
-Provide 3-4 recommendations. Examples of recommendation types:
-reroute via alternative port, delay departure by N days, increase insurance coverage,
-pre-position safety stock, switch to air freight for critical items, notify consignee.
-Base cost and delay_factor on the simulation numbers above.
+Provide 3-4 recommendations. Examples: reroute via alternative port, delay departure,
+increase insurance, pre-position safety stock, switch to air freight, notify consignee.
 Return ONLY valid JSON. No explanation outside the JSON."""
 
-    return prompt
-
-
-# ─────────────────────────────────────────────────────────────────
-# OPENROUTER CALL
-# ─────────────────────────────────────────────────────────────────
 
 def _call_openrouter(prompt: str) -> str:
-    """
-    Call OpenRouter with model fallback.
-    Returns raw response text or raises on complete failure.
-    """
     if not OPENROUTER_API_KEY:
-        raise EnvironmentError(
-            "OPENROUTER_API_KEY not set. Add it to .env or environment."
-        )
+        raise EnvironmentError("OPENROUTER_API_KEY not set.")
 
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -149,30 +190,25 @@ def _call_openrouter(prompt: str) -> str:
 
     last_error = None
     for model in MODELS:
-        payload = {
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 800,
-            "temperature": 0.3,   # low temp = more consistent JSON
-        }
         try:
             logger.info("Calling OpenRouter model: %s", model)
             resp = requests.post(
                 OPENROUTER_URL,
                 headers=headers,
-                json=payload,
+                json={
+                    "model":       model,
+                    "messages":    [{"role": "user", "content": prompt}],
+                    "max_tokens":  800,
+                    "temperature": 0.3,
+                },
                 timeout=30,
             )
             if resp.status_code == 200:
                 content = resp.json()["choices"][0]["message"]["content"]
-                logger.info("OpenRouter call succeeded with model: %s", model)
+                logger.info("OpenRouter succeeded with model: %s", model)
                 return content
-            else:
-                logger.warning(
-                    "Model %s returned HTTP %s: %s",
-                    model, resp.status_code, resp.text[:200]
-                )
-                last_error = f"HTTP {resp.status_code}"
+            logger.warning("Model %s HTTP %s: %s", model, resp.status_code, resp.text[:200])
+            last_error = f"HTTP {resp.status_code}"
         except requests.Timeout:
             logger.warning("Model %s timed out.", model)
             last_error = "timeout"
@@ -183,35 +219,21 @@ def _call_openrouter(prompt: str) -> str:
     raise RuntimeError(f"All OpenRouter models failed. Last error: {last_error}")
 
 
-# ─────────────────────────────────────────────────────────────────
-# RESPONSE PARSER
-# ─────────────────────────────────────────────────────────────────
-
 def _parse_llm_response(raw: str) -> tuple[str, List[RecommendationItem]]:
-    """
-    Parse LLM JSON response into (advisory_text, [RecommendationItem]).
-    Robust — handles markdown fences and minor formatting issues.
-    """
-    # Strip markdown fences if present
     cleaned = re.sub(r"```(?:json)?", "", raw).strip()
-
-    # Extract first JSON object
-    match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+    match   = re.search(r"\{.*\}", cleaned, re.DOTALL)
     if not match:
-        logger.error("No JSON found in LLM response: %s", raw[:300])
-        return _fallback_advisory(), _fallback_recommendations()
-
+        logger.error("No JSON in LLM response: %s", raw[:300])
+        return _fallback_advisory(), _fallback_llm_recommendations()
     try:
         data = json.loads(match.group())
     except json.JSONDecodeError as e:
-        logger.error("JSON parse failed: %s | raw: %s", e, cleaned[:300])
-        return _fallback_advisory(), _fallback_recommendations()
+        logger.error("JSON parse failed: %s", e)
+        return _fallback_advisory(), _fallback_llm_recommendations()
 
     advisory = data.get("advisory", _fallback_advisory())
-    raw_recs = data.get("recommendations", [])
-
-    items = []
-    for r in raw_recs:
+    items    = []
+    for r in data.get("recommendations", []):
         try:
             items.append(RecommendationItem(
                 route        = str(r.get("route",        "Unknown action")),
@@ -220,12 +242,9 @@ def _parse_llm_response(raw: str) -> tuple[str, List[RecommendationItem]]:
                 reason       = str(r.get("reason",       "")),
             ))
         except Exception as e:
-            logger.warning("Skipping malformed recommendation: %s | %s", r, e)
+            logger.warning("Skipping malformed rec: %s | %s", r, e)
 
-    if not items:
-        items = _fallback_recommendations()
-
-    return advisory, items
+    return advisory, items or _fallback_llm_recommendations()
 
 
 def _fallback_advisory() -> str:
@@ -235,63 +254,32 @@ def _fallback_advisory() -> str:
     )
 
 
-def _fallback_recommendations() -> List[RecommendationItem]:
+def _fallback_llm_recommendations() -> List[RecommendationItem]:
     return [
         RecommendationItem(
-            route="Review alternate routing",
-            cost=2000.0,
-            delay_factor=0.7,
-            reason="Fallback recommendation — LLM response unavailable.",
-        )
-    ]
-
-
-# ─────────────────────────────────────────────────────────────────
-# PUBLIC API
-# ─────────────────────────────────────────────────────────────────
-
-def get_recommendations(
-    input_data: Dict[str, Union[float, str]],
-) -> List[RecommendationItem]:
-    """
-    Called by /recommend endpoint.
-    Standalone use — returns pointer to full pipeline.
-    """
-    logger.info("get_recommendations called (standalone).")
-    return [
-        RecommendationItem(
-            route="Run full pipeline",
-            cost=0.0,
-            delay_factor=1.0,
-            reason="Use /run_pipeline for full prediction + simulation + LLM recommendations.",
+            route        = "Review alternate routing",
+            cost         = 2000.0,
+            delay_factor = 0.7,
+            reason       = "Fallback — LLM response unavailable.",
         )
     ]
 
 
 def get_llm_recommendations(
-    prediction:  PredictionResponse,
-    simulation:  SimulationResponse,
-    input_data:  Dict[str, Union[float, str]],
+    prediction: PredictionResponse,
+    simulation: SimulationResponse,
+    input_data: Dict[str, Union[float, str]],
 ) -> tuple[str, List[RecommendationItem]]:
-    """
-    Called by pipeline_service after simulation.
-    Returns (advisory_text, [RecommendationItem]).
-    """
     logger.info("Generating LLM recommendations via OpenRouter.")
-
     prompt = _build_prompt(prediction, simulation, input_data)
-
     try:
-        raw = _call_openrouter(prompt)
+        raw             = _call_openrouter(prompt)
         advisory, items = _parse_llm_response(raw)
         logger.info("LLM recommendations parsed: %d items", len(items))
         return advisory, items
     except EnvironmentError as e:
         logger.error("OpenRouter not configured: %s", e)
-        return (
-            f"OpenRouter API key not configured. {_fallback_advisory()}",
-            _fallback_recommendations(),
-        )
+        return f"OpenRouter API key not configured. {_fallback_advisory()}", _fallback_llm_recommendations()
     except Exception as e:
         logger.error("LLM call failed: %s", e)
-        return _fallback_advisory(), _fallback_recommendations()
+        return _fallback_advisory(), _fallback_llm_recommendations()
