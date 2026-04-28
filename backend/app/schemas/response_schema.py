@@ -42,9 +42,11 @@ class RecommendationItem(BaseModel):
     route: str
     cost: float
     delay_factor: float
+    reason: str = ""
 
 
 class PipelineResponse(BaseModel):
     prediction: PredictionResponse
-    simulation: Optional[SimulationResponse]
-    recommendation: Optional[List[RecommendationItem]]
+    simulation: Optional[SimulationResponse] = None
+    recommendation: Optional[List[RecommendationItem]] = None
+    advisory: Optional[str] = None

@@ -63,9 +63,13 @@ def run_pipeline(
         prediction=prediction,
         simulation=simulation,
         recommendation=recommendation,
+        advisory=advisory,
     )
     
-    # Save output data to Firebase
-    firebase_service.save_pipeline_run(response.model_dump())
+    # Save run (input + output) to Firebase for history
+    firebase_service.save_pipeline_run(
+        output_data=response.model_dump(),
+        input_data=input_data,
+    )
     
     return response

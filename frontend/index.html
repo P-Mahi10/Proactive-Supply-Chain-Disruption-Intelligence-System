@@ -68,146 +68,371 @@
         </div>
       </header>
 
-      <main class="dashboard-grid">
-        <!-- Left Side: Input Form -->
-        <section class="glass-panel form-section">
-          <h2><i class="fa-solid fa-sliders"></i> Metrics Input</h2>
-          <form id="pipeline-form">
-            <div class="form-grid">
-              <div class="input-group">
-                <label for="port_name">Port Name</label>
-                <input
-                  type="text"
-                  id="port_name"
-                  name="port_name"
-                  value="Busan"
-                  required
-                />
-              </div>
-              <div class="input-group">
-                <label for="portcalls">Daily Portcalls</label>
-                <input
-                  type="number"
-                  id="portcalls"
-                  name="portcalls"
-                  value="59"
-                  required
-                />
-              </div>
-              <div class="input-group">
-                <label for="cargo_volume_teu">Cargo Volume (TEU)</label>
-                <input
-                  type="number"
-                  id="cargo_volume_teu"
-                  name="cargo_volume_teu"
-                  value="378138"
-                  required
-                />
-              </div>
-              <div class="input-group">
-                <label for="rainfall_mm">Rainfall (mm)</label>
-                <input
-                  type="number"
-                  id="rainfall_mm"
-                  name="rainfall_mm"
-                  value="7.1"
-                  step="0.1"
-                  required
-                />
-              </div>
-              <div class="input-group">
-                <label for="wind_speed_kmh">Wind Speed (km/h)</label>
-                <input
-                  type="number"
-                  id="wind_speed_kmh"
-                  name="wind_speed_kmh"
-                  value="12.3"
-                  step="0.1"
-                  required
-                />
-              </div>
-              <div class="input-group">
-                <label for="disruption_flag">Active Disruption Flag</label>
-                <input
-                  type="number"
-                  id="disruption_flag"
-                  name="disruption_flag"
-                  value="0"
-                  min="0"
-                  max="1"
-                  required
-                />
-              </div>
-            </div>
-
-            <button type="submit" class="primary-btn" id="analyze-btn">
-              <span>Run Intelligence Pipeline</span>
-              <i class="fa-solid fa-arrow-right"></i>
+      <main class="app-layout">
+        <aside class="sidebar glass-panel">
+          <nav class="side-nav">
+            <button class="nav-btn active" data-view="analyze-view">
+              <i class="fa-solid fa-microscope"></i>
+              <span>Intelligence</span>
             </button>
-          </form>
-        </section>
+            <button class="nav-btn" data-view="history-view">
+              <i class="fa-solid fa-history"></i>
+              <span>History</span>
+            </button>
+            <button class="nav-btn" data-view="dashboard-view">
+              <i class="fa-solid fa-chart-pie"></i>
+              <span>Dashboard</span>
+            </button>
+          </nav>
+          <div class="sidebar-footer">
+            <button id="download-sample-csv" class="text-btn">
+              <i class="fa-solid fa-download"></i> Sample CSV
+            </button>
+          </div>
+        </aside>
 
-        <!-- Right Side: Results -->
-        <section class="results-section">
-          <!-- Loading State -->
-          <div class="glass-panel loading-state hidden" id="loading-spinner">
-            <div class="spinner"></div>
-            <p>Analyzing global metrics...</p>
+        <div class="content-area">
+          <!-- Analyze View (Existing Form + Results) -->
+          <div id="analyze-view" class="view-pane active">
+            <div class="dashboard-grid">
+              <!-- Left Side: Input Form -->
+              <section class="glass-panel form-section">
+                <div class="form-header">
+                  <h2><i class="fa-solid fa-sliders"></i> Metrics Input</h2>
+                  <div class="csv-upload-container">
+                    <label for="csv-upload" class="csv-upload-label">
+                      <i class="fa-solid fa-file-csv"></i> Auto-fill CSV
+                    </label>
+                    <input type="file" id="csv-upload" accept=".csv" class="hidden" />
+                  </div>
+                </div>
+
+                <form id="pipeline-form">
+                  <!-- Tabs Navigation -->
+                  <div class="tabs-nav">
+                    <button type="button" class="tab-btn active" data-tab="tab-route">Route</button>
+                    <button type="button" class="tab-btn" data-tab="tab-activity">Activity</button>
+                    <button type="button" class="tab-btn" data-tab="tab-risk">Risk</button>
+                    <button type="button" class="tab-btn" data-tab="tab-weather">Weather</button>
+                    <button type="button" class="tab-btn" data-tab="tab-temporal">Temporal</button>
+                    <button type="button" class="tab-btn" data-tab="tab-lags">Lags</button>
+                  </div>
+
+                  <div class="tabs-content">
+                    <!-- Tab 1: Route -->
+                    <div id="tab-route" class="tab-pane active">
+                      <div class="form-grid">
+                        <div class="input-group">
+                          <label for="origin_port">Origin Port</label>
+                          <select id="origin_port" name="origin_port" required>
+                            <option value="Shanghai (Pudong)">Shanghai (Pudong)</option>
+                            <option value="Singapore">Singapore</option>
+                            <option value="Busan">Busan</option>
+                            <option value="Ningbo">Ningbo</option>
+                            <option value="Shenzhen">Shenzhen</option>
+                            <option value="Qingdao">Qingdao</option>
+                            <option value="Tianjin">Tianjin</option>
+                            <option value="Hong Kong">Hong Kong</option>
+                            <option value="Rotterdam">Rotterdam</option>
+                            <option value="Antwerp">Antwerp</option>
+                            <option value="Hamburg">Hamburg</option>
+                            <option value="Los Angeles">Los Angeles</option>
+                            <option value="New York">New York</option>
+                            <option value="Jebel Ali">Jebel Ali</option>
+                            <option value="Colombo">Colombo</option>
+                            <option value="Tanjung Pelepas">Tanjung Pelepas</option>
+                            <option value="Port Said">Port Said</option>
+                            <option value="Felixstowe">Felixstowe</option>
+                            <option value="Yokohama">Yokohama</option>
+                            <option value="Karachi">Karachi</option>
+                            <option value="JNPT">JNPT</option>
+                            <option value="Mundra">Mundra</option>
+                            <option value="Chennai">Chennai</option>
+                            <option value="Visakhapatnam">Visakhapatnam</option>
+                            <option value="Kolkata">Kolkata</option>
+                            <option value="Cochin">Cochin</option>
+                            <option value="Pipavav">Pipavav</option>
+                          </select>
+                        </div>
+                        <div class="input-group">
+                          <label for="destination_port">Destination Port</label>
+                          <select id="destination_port" name="destination_port" required>
+                            <option value="Singapore">Singapore</option>
+                            <option value="Shanghai (Pudong)">Shanghai (Pudong)</option>
+                            <option value="Busan">Busan</option>
+                            <option value="Ningbo">Ningbo</option>
+                            <option value="Shenzhen">Shenzhen</option>
+                            <option value="Qingdao">Qingdao</option>
+                            <option value="Tianjin">Tianjin</option>
+                            <option value="Hong Kong">Hong Kong</option>
+                            <option value="Rotterdam">Rotterdam</option>
+                            <option value="Antwerp">Antwerp</option>
+                            <option value="Hamburg">Hamburg</option>
+                            <option value="Los Angeles">Los Angeles</option>
+                            <option value="New York">New York</option>
+                            <option value="Jebel Ali">Jebel Ali</option>
+                            <option value="Colombo">Colombo</option>
+                            <option value="Tanjung Pelepas">Tanjung Pelepas</option>
+                            <option value="Port Said">Port Said</option>
+                            <option value="Felixstowe">Felixstowe</option>
+                            <option value="Yokohama">Yokohama</option>
+                            <option value="Karachi">Karachi</option>
+                            <option value="JNPT">JNPT</option>
+                            <option value="Mundra">Mundra</option>
+                            <option value="Chennai">Chennai</option>
+                            <option value="Visakhapatnam">Visakhapatnam</option>
+                            <option value="Kolkata">Kolkata</option>
+                            <option value="Cochin">Cochin</option>
+                            <option value="Pipavav">Pipavav</option>
+                          </select>
+                        </div>
+                        <div class="input-group">
+                          <label for="cargo_type">Cargo Type</label>
+                          <select id="cargo_type" name="cargo_type">
+                            <option value="container">Container</option>
+                            <option value="dry_bulk">Dry Bulk</option>
+                            <option value="tanker">Tanker</option>
+                            <option value="general_cargo">General Cargo</option>
+                          </select>
+                        </div>
+                        <div class="input-group">
+                          <label for="season">Season</label>
+                          <select id="season" name="season">
+                            <option value="summer">Summer</option>
+                            <option value="winter">Winter</option>
+                            <option value="monsoon">Monsoon</option>
+                            <option value="spring">Spring</option>
+                            <option value="autumn">Autumn</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Other tabs (Activity, Risk, Weather, Temporal, Lags) same as before -->
+                    <div id="tab-activity" class="tab-pane hidden">
+                      <div class="form-grid">
+                        <div class="input-group"><label>Total Portcalls</label><input type="number" id="portcalls" value="150"></div>
+                        <div class="input-group"><label>Cargo Vol (TEU)</label><input type="number" id="cargo_volume_teu" value="12000"></div>
+                        <div class="input-group"><label>Total Trade (USD)</label><input type="number" id="total_trade_usd" value="5000000"></div>
+                        <div class="input-group"><label>Berth Occupancy (0-1)</label><input type="number" id="berth_occupancy_rate" step="0.01" value="0.75"></div>
+                        <div class="input-group"><label>Vessels in Queue</label><input type="number" id="vessels_in_queue" value="5"></div>
+                        <div class="input-group"><label>Import Containers</label><input type="number" id="import_container" value="6000"></div>
+                        <div class="input-group"><label>Export Containers</label><input type="number" id="export_container" value="5500"></div>
+                        <div class="input-group"><label>Portcalls: Container</label><input type="number" id="portcalls_container" value="80"></div>
+                        <div class="input-group"><label>Portcalls: Dry Bulk</label><input type="number" id="portcalls_dry_bulk" value="30"></div>
+                        <div class="input-group"><label>Portcalls: Tanker</label><input type="number" id="portcalls_tanker" value="20"></div>
+                        <div class="input-group"><label>Portcalls: Gen Cargo</label><input type="number" id="portcalls_general_cargo" value="20"></div>
+                      </div>
+                    </div>
+                    <div id="tab-risk" class="tab-pane hidden">
+                      <div class="form-grid">
+                        <div class="input-group"><label>Hist Disruption Rate (0-1)</label><input type="number" id="historical_disruption_rate" step="0.01" value="0.05"></div>
+                        <div class="input-group"><label>Days Since Last Disruption</label><input type="number" id="days_since_last_disruption" value="45"></div>
+                        <div class="input-group"><label>Active Disruptions Nearby</label><input type="number" id="active_disruptions_nearby" value="0"></div>
+                        <div class="input-group">
+                          <label>Disruption Flag</label>
+                          <select id="disruption_flag"><option value="0">0 - None</option><option value="1">1 - Active</option></select>
+                        </div>
+                      </div>
+                    </div>
+                    <div id="tab-weather" class="tab-pane hidden">
+                      <div class="form-grid">
+                        <div class="input-group"><label>Severity (1-5)</label><input type="number" id="weather_forecast_severity" value="1"></div>
+                        <div class="input-group"><label>Cyclone Prob (0-1)</label><input type="number" id="cyclone_probability" step="0.01" value="0.01"></div>
+                        <div class="input-group"><label>Wind Speed (km/h)</label><input type="number" id="wind_speed_kmh" value="15"></div>
+                        <div class="input-group"><label>Wave Height (m)</label><input type="number" id="wave_height_m" value="1.2"></div>
+                        <div class="input-group"><label>Rainfall (mm)</label><input type="number" id="rainfall_mm" value="2"></div>
+                        <div class="input-group"><label>Visibility (km)</label><input type="number" id="visibility_km" value="10"></div>
+                      </div>
+                    </div>
+                    <div id="tab-temporal" class="tab-pane hidden">
+                      <div class="form-grid">
+                        <div class="input-group">
+                          <label>Month</label>
+                          <select id="month">
+                            <option value="1">1 - Jan</option><option value="2">2 - Feb</option><option value="3">3 - Mar</option><option value="4" selected>4 - Apr</option><option value="5">5 - May</option><option value="6">6 - Jun</option><option value="7">7 - Jul</option><option value="8">8 - Aug</option><option value="9">9 - Sep</option><option value="10">10 - Oct</option><option value="11">11 - Nov</option><option value="12">12 - Dec</option>
+                          </select>
+                        </div>
+                        <div class="input-group">
+                          <label>Day of Week</label>
+                          <select id="day_of_week">
+                            <option value="0">0 - Mon</option><option value="1">1 - Tue</option><option value="2" selected>2 - Wed</option><option value="3">3 - Thu</option><option value="4">4 - Fri</option><option value="5">5 - Sat</option><option value="6">6 - Sun</option>
+                          </select>
+                        </div>
+                        <div class="input-group"><label>Trend Calls</label><input type="number" id="trend_calls" step="0.1" value="0.5"></div>
+                        <div class="input-group"><label>Trend Cargo</label><input type="number" id="trend_cargo" step="0.1" value="0.8"></div>
+                      </div>
+                    </div>
+                    <div id="tab-lags" class="tab-pane hidden">
+                      <div class="lag-group">
+                        <h4>Portcalls Lag (1-7)</h4>
+                        <div class="form-grid">
+                          <input type="number" id="portcalls_lag1" value="145"><input type="number" id="portcalls_lag2" value="140"><input type="number" id="portcalls_lag3" value="155"><input type="number" id="portcalls_lag4" value="150"><input type="number" id="portcalls_lag5" value="148"><input type="number" id="portcalls_lag6" value="152"><input type="number" id="portcalls_lag7" value="147">
+                        </div>
+                      </div>
+                      <div class="lag-group">
+                        <h4>Cargo Lag (1-7)</h4>
+                        <div class="form-grid">
+                          <input type="number" id="cargo_lag1" value="11500"><input type="number" id="cargo_lag2" value="11800"><input type="number" id="cargo_lag3" value="12200"><input type="number" id="cargo_lag4" value="12000"><input type="number" id="cargo_lag5" value="11900"><input type="number" id="cargo_lag6" value="12100"><input type="number" id="cargo_lag7" value="11700">
+                        </div>
+                      </div>
+                      <div class="lag-group">
+                        <h4>Rainfall Lag (1-7)</h4>
+                        <div class="form-grid">
+                          <input type="number" id="rainfall_lag1" value="1.5"><input type="number" id="rainfall_lag2" value="2.0"><input type="number" id="rainfall_lag3" value="0.5"><input type="number" id="rainfall_lag4" value="1.2"><input type="number" id="rainfall_lag5" value="3.0"><input type="number" id="rainfall_lag6" value="0.0"><input type="number" id="rainfall_lag7" value="2.5">
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button type="submit" class="primary-btn" id="analyze-btn">
+                    <span>Run Intelligence Pipeline</span>
+                    <i class="fa-solid fa-arrow-right"></i>
+                  </button>
+                </form>
+              </section>
+
+              <!-- Right Side: Results -->
+              <section class="results-section">
+                <!-- Loading State -->
+                <div class="glass-panel loading-state hidden" id="loading-spinner">
+                  <div class="spinner"></div>
+                  <p>Analyzing global metrics...</p>
+                </div>
+
+                <!-- Advisory Card -->
+                <div class="glass-panel result-card hidden" id="advisory-card">
+                  <div class="card-header">
+                    <h3><i class="fa-solid fa-brain"></i> AI Advisory</h3>
+                  </div>
+                  <p id="advisory-text" class="advisory-text"></p>
+                </div>
+
+                <!-- Prediction Card -->
+                <div class="glass-panel result-card hidden" id="prediction-card">
+                  <div class="card-header">
+                    <h3><i class="fa-solid fa-chart-line"></i> Risk Prediction</h3>
+                    <span class="badge" id="risk-badge">HIGH</span>
+                  </div>
+                  <div class="metric-row">
+                    <div class="metric-block">
+                      <span class="label">Congestion Probability</span>
+                      <span class="value" id="prob-val">0%</span>
+                    </div>
+                    <div class="metric-block">
+                      <span class="label">Predicted Occupancy (t+2)</span>
+                      <span class="value" id="occ-val">0%</span>
+                    </div>
+                  </div>
+                  <div class="progress-bar-container">
+                    <div class="progress-bar" id="prob-bar"></div>
+                  </div>
+                </div>
+
+                <!-- Simulation Card -->
+                <div class="glass-panel result-card hidden" id="simulation-card">
+                  <div class="card-header">
+                    <h3><i class="fa-solid fa-clock"></i> Disruption Simulation</h3>
+                    <span class="badge" id="congestion-badge">LOW</span>
+                  </div>
+                  <div class="sim-route-label" id="sim-route-label"></div>
+                  <div class="metric-row">
+                    <div class="metric-block">
+                      <span class="label">Median Delay</span>
+                      <span class="value" id="delay-val">0 hrs</span>
+                    </div>
+                    <div class="metric-block">
+                      <span class="label">P90 Delay</span>
+                      <span class="value" id="delay-p90-val">0 hrs</span>
+                    </div>
+                    <div class="metric-block">
+                      <span class="label">Disruption Prob</span>
+                      <span class="value" id="disruption-prob-val">0%</span>
+                    </div>
+                    <div class="metric-block">
+                      <span class="label">SLA Breach</span>
+                      <span class="value" id="sla-breach-val">0%</span>
+                    </div>
+                  </div>
+                  <div class="recommended-route" id="recommended-route-block" style="display:none">
+                    <i class="fa-solid fa-route"></i>
+                    <span id="recommended-route-text"></span>
+                  </div>
+                  <div id="route-options-container"></div>
+                </div>
+
+                <!-- Recommendation Card -->
+                <div class="glass-panel result-card hidden" id="recommendation-card">
+                  <div class="card-header">
+                    <h3><i class="fa-solid fa-route"></i> Optimal Rerouting Alternatives</h3>
+                  </div>
+                  <div class="routes-list" id="routes-container"></div>
+                </div>
+              </section>
+            </div>
           </div>
 
-          <!-- Prediction Card -->
-          <div class="glass-panel result-card hidden" id="prediction-card">
-            <div class="card-header">
-              <h3><i class="fa-solid fa-chart-line"></i> Risk Prediction</h3>
-              <span class="badge" id="risk-badge">HIGH</span>
-            </div>
-            <div class="metric-row">
-              <div class="metric-block">
-                <span class="label">Congestion Probability</span>
-                <span class="value" id="prob-val">0%</span>
+          <!-- History View -->
+          <div id="history-view" class="view-pane hidden">
+            <section class="glass-panel history-section">
+              <div class="section-header">
+                <h2><i class="fa-solid fa-history"></i> Past Shipment Intelligence</h2>
+                <button id="refresh-history-btn" class="secondary-btn small-btn">
+                  <i class="fa-solid fa-sync"></i> Refresh
+                </button>
               </div>
-              <div class="metric-block">
-                <span class="label">Predicted Occupancy (t+2)</span>
-                <span class="value" id="occ-val">0%</span>
+              <div class="history-table-container">
+                <table class="history-table">
+                  <thead>
+                    <tr>
+                      <th>Timestamp</th>
+                      <th>Origin</th>
+                      <th>Destination</th>
+                      <th>Risk Level</th>
+                      <th>Prob</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="history-list-body">
+                    <!-- Populated by JS -->
+                  </tbody>
+                </table>
               </div>
-            </div>
-            <div class="progress-bar-container">
-              <div class="progress-bar" id="prob-bar"></div>
-            </div>
+            </section>
           </div>
 
-          <!-- Simulation Card -->
-          <div class="glass-panel result-card hidden" id="simulation-card">
-            <div class="card-header">
-              <h3><i class="fa-solid fa-clock"></i> Disruption Simulation</h3>
-            </div>
-            <div class="metric-row">
-              <div class="metric-block">
-                <span class="label">Estimated Delay</span>
-                <span class="value" id="delay-val">0 hrs</span>
+          <!-- Dashboard View -->
+          <div id="dashboard-view" class="view-pane hidden">
+            <div class="dashboard-stats-grid">
+              <div class="glass-panel stat-card">
+                <h3>Total Runs</h3>
+                <div class="stat-value" id="total-runs-stat">0</div>
               </div>
-              <div class="metric-block">
-                <span class="label">Queue Size</span>
-                <span class="value" id="queue-val">0</span>
+              <div class="glass-panel stat-card">
+                <h3>High Risk Rate</h3>
+                <div class="stat-value" id="high-risk-rate-stat">0%</div>
+              </div>
+              <div class="glass-panel stat-card">
+                <h3>Avg Congestion</h3>
+                <div class="stat-value" id="avg-congestion-stat">0%</div>
+              </div>
+            </div>
+            <div class="charts-grid">
+              <div class="glass-panel chart-container">
+                <h3>Risk Level Distribution</h3>
+                <canvas id="risk-dist-chart"></canvas>
+              </div>
+              <div class="glass-panel chart-container">
+                <h3>Congestion Probability Trend</h3>
+                <canvas id="congestion-trend-chart"></canvas>
               </div>
             </div>
           </div>
-
-          <!-- Recommendation Card -->
-          <div class="glass-panel result-card hidden" id="recommendation-card">
-            <div class="card-header">
-              <h3>
-                <i class="fa-solid fa-route"></i> Optimal Rerouting Alternatives
-              </h3>
-            </div>
-            <div class="routes-list" id="routes-container">
-              <!-- Populated by JS -->
-            </div>
-          </div>
-        </section>
+        </div>
       </main>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="module" src="auth.js"></script>
     <script type="module" src="script.js"></script>
   </body>

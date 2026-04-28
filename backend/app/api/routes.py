@@ -1,6 +1,7 @@
 from typing import List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from app.api.auth import verify_token
 
 from app.schemas.request_schema import InputRequest
 from app.schemas.response_schema import (
@@ -10,6 +11,7 @@ from app.schemas.response_schema import (
     SimulationResponse,
 )
 from app.services import (
+    firebase_service,
     pipeline_service,
     prediction_service,
     simulation_service,
@@ -18,7 +20,7 @@ from app.services import (
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(verify_token)])
 
 
 @router.post("/predict", response_model=PredictionResponse)
@@ -62,3 +64,10 @@ def run_pipeline(request: InputRequest) -> PipelineResponse:
     response = pipeline_service.run_pipeline(request.input_data)
     logger.info("Pipeline response assembled.")
     return response
+
+
+@router.get("/history")
+def get_history(limit: int = 20):
+    logger.info("Request received: /history")
+    history = firebase_service.get_recent_runs(limit=limit)
+    return history
