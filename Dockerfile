@@ -46,6 +46,6 @@ USER appuser
 # `app.main:app` works because /app/backend is on PYTHONPATH,
 # which mirrors running `uvicorn app.main:app` from inside backend/.
 CMD ["uvicorn", "app.main:app", \
-     "--host", "0.0.0.0", \
-     "--port", "8080", \
-     "--workers", "1"]
+    "--host", "0.0.0.0", \
+    "--port", "8000", \
+    "--workers", "1"]

@@ -126,12 +126,12 @@ document.addEventListener("DOMContentLoaded", () => {
   let historyData = [];
   async function fetchHistory() {
     try {
-      const response = await fetch(`${NODE_BASE_URL}/history`, {
-        headers: {
-          "Authorization": `Bearer ${window.firebaseAuthToken}`
-        }
-      });
-      if (!response.ok) throw new Error("Failed to fetch history");
+      const response = await fetch(`${API_BASE_URL}/history`);
+      if (!response.ok) {
+        const body = await response.text().catch(() => "<no body>");
+        console.error("History fetch failed", { status: response.status, body });
+        throw new Error(`Failed to fetch history: HTTP ${response.status}`);
+      }
       historyData = await response.json();
       renderHistoryList();
     } catch (err) {
@@ -259,7 +259,6 @@ document.addEventListener("DOMContentLoaded", () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${window.firebaseAuthToken}`
         },
         body: JSON.stringify({ input_data: inputData }),
       });
