@@ -1,4 +1,4 @@
-import API_BASE_URL, { NODE_BASE_URL } from "./api.js";
+import API_BASE_URL from "./api.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   // ─── View Switching ───────────────────────────────────────────────────────────
@@ -14,7 +14,13 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById(target).classList.add("active");
 
       if (target === "history-view") fetchHistory();
-      if (target === "dashboard-view") updateDashboard();
+      if (target === "dashboard-view") {
+        if (historyData.length === 0) {
+          fetchHistory();
+        } else {
+          updateDashboard();
+        }
+      }
     });
   });
 
@@ -90,7 +96,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (evt) => {
-      const lines = evt.target.result.split("\n").map(l => l.trim()).filter(l => l);
+      const lines = evt.target.result
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l);
       if (lines.length < 2) return showToast("Invalid CSV format", "error");
       const headers = lines[0].split(",");
       const data = lines[1].split(",");
@@ -106,34 +115,88 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // ─── Sample CSV Download ─────────────────────────────────────────────────────
-  document.getElementById("download-sample-csv").addEventListener("click", () => {
-    const headers = Object.keys(CSV_FIELD_MAP).join(",");
-    const sampleData = [
-      "Singapore", "Shanghai (Pudong)", "150", "12000", "5000000", "80", "30", "20", "20", "6000", "5500", "0.75", "5", "0.05", "45", "0", "0", "1", "0.01", "15", "1.2", "2", "10", "4", "2", "0.5", "0.8", "145", "140", "155", "150", "148", "152", "147", "11500", "11800", "12200", "12000", "11900", "12100", "11700", "1.5", "2.0", "0.5", "1.2", "3.0", "0.0", "2.5"
-    ].join(",");
-    const csvContent = "data:text/csv;charset=utf-8," + headers + "\n" + sampleData;
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "sample_supply_chain_data.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  });
+  document
+    .getElementById("download-sample-csv")
+    .addEventListener("click", () => {
+      const headers = Object.keys(CSV_FIELD_MAP).join(",");
+      const sampleData = [
+        "Singapore",
+        "Shanghai (Pudong)",
+        "150",
+        "12000",
+        "5000000",
+        "80",
+        "30",
+        "20",
+        "20",
+        "6000",
+        "5500",
+        "0.75",
+        "5",
+        "0.05",
+        "45",
+        "0",
+        "0",
+        "1",
+        "0.01",
+        "15",
+        "1.2",
+        "2",
+        "10",
+        "4",
+        "2",
+        "0.5",
+        "0.8",
+        "145",
+        "140",
+        "155",
+        "150",
+        "148",
+        "152",
+        "147",
+        "11500",
+        "11800",
+        "12200",
+        "12000",
+        "11900",
+        "12100",
+        "11700",
+        "1.5",
+        "2.0",
+        "0.5",
+        "1.2",
+        "3.0",
+        "0.0",
+        "2.5",
+      ].join(",");
+      const csvContent =
+        "data:text/csv;charset=utf-8," + headers + "\n" + sampleData;
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "sample_supply_chain_data.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
 
   // ─── History Logic ───────────────────────────────────────────────────────────
-  // Hits Node.js backend (port 5000) — handles DB/Firebase routes
+  // Hits FastAPI backend — handles DB/Firebase routes
   let historyData = [];
   async function fetchHistory() {
     try {
       const response = await fetch(`${API_BASE_URL}/history`);
       if (!response.ok) {
         const body = await response.text().catch(() => "<no body>");
-        console.error("History fetch failed", { status: response.status, body });
+        console.error("History fetch failed", {
+          status: response.status,
+          body,
+        });
         throw new Error(`Failed to fetch history: HTTP ${response.status}`);
       }
       historyData = await response.json();
       renderHistoryList();
+      updateDashboard();
     } catch (err) {
       console.error(err);
       showToast("Error loading history", "error");
@@ -142,7 +205,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function renderHistoryList() {
     const body = document.getElementById("history-list-body");
-    body.innerHTML = historyData.map(run => `
+    body.innerHTML = historyData
+      .map(
+        (run) => `
       <tr>
         <td>${new Date(run.timestamp).toLocaleString()}</td>
         <td>${run.origin_port}</td>
@@ -151,11 +216,13 @@ document.addEventListener("DOMContentLoaded", () => {
         <td>${(run.congestion_probability * 100).toFixed(1)}%</td>
         <td><button class="load-run-btn" data-id="${run.id}">Load</button></td>
       </tr>
-    `).join("");
+    `,
+      )
+      .join("");
 
-    body.querySelectorAll(".load-run-btn").forEach(btn => {
+    body.querySelectorAll(".load-run-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
-        const run = historyData.find(r => r.id === btn.dataset.id);
+        const run = historyData.find((r) => r.id === btn.dataset.id);
         if (run) loadRunData(run);
       });
     });
@@ -170,7 +237,9 @@ document.addEventListener("DOMContentLoaded", () => {
     showToast("Historical data loaded into form");
   }
 
-  document.getElementById("refresh-history-btn").addEventListener("click", fetchHistory);
+  document
+    .getElementById("refresh-history-btn")
+    .addEventListener("click", fetchHistory);
 
   // ─── Dashboard Logic ─────────────────────────────────────────────────────────
   let riskChart, trendChart;
@@ -179,45 +248,61 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Update Stats
     document.getElementById("total-runs-stat").textContent = historyData.length;
-    const highRiskCount = historyData.filter(r => r.risk_level === "HIGH").length;
-    document.getElementById("high-risk-rate-stat").textContent = ((highRiskCount / historyData.length) * 100).toFixed(1) + "%";
-    const avgCong = historyData.reduce((acc, r) => acc + r.congestion_probability, 0) / historyData.length;
-    document.getElementById("avg-congestion-stat").textContent = (avgCong * 100).toFixed(1) + "%";
+    const highRiskCount = historyData.filter(
+      (r) => r.risk_level === "HIGH",
+    ).length;
+    document.getElementById("high-risk-rate-stat").textContent =
+      ((highRiskCount / historyData.length) * 100).toFixed(1) + "%";
+    const avgCong =
+      historyData.reduce((acc, r) => acc + r.congestion_probability, 0) /
+      historyData.length;
+    document.getElementById("avg-congestion-stat").textContent =
+      (avgCong * 100).toFixed(1) + "%";
 
     // Risk Distribution Chart
     const riskCounts = { HIGH: 0, MEDIUM: 0, LOW: 0 };
-    historyData.forEach(r => riskCounts[r.risk_level]++);
+    historyData.forEach((r) => riskCounts[r.risk_level]++);
 
     if (riskChart) riskChart.destroy();
     riskChart = new Chart(document.getElementById("risk-dist-chart"), {
-      type: 'doughnut',
+      type: "doughnut",
       data: {
-        labels: ['High', 'Medium', 'Low'],
-        datasets: [{
-          data: [riskCounts.HIGH, riskCounts.MEDIUM, riskCounts.LOW],
-          backgroundColor: ['#dc2626', '#d97706', '#16a34a']
-        }]
+        labels: ["High", "Medium", "Low"],
+        datasets: [
+          {
+            data: [riskCounts.HIGH, riskCounts.MEDIUM, riskCounts.LOW],
+            backgroundColor: ["#dc2626", "#d97706", "#16a34a"],
+          },
+        ],
       },
-      options: { responsive: true, maintainAspectRatio: false }
+      options: { responsive: true, maintainAspectRatio: false },
     });
 
     // Trend Chart
     const trendData = [...historyData].reverse().slice(-10);
     if (trendChart) trendChart.destroy();
     trendChart = new Chart(document.getElementById("congestion-trend-chart"), {
-      type: 'line',
+      type: "line",
       data: {
-        labels: trendData.map(r => new Date(r.timestamp).toLocaleTimeString()),
-        datasets: [{
-          label: 'Congestion Prob',
-          data: trendData.map(r => r.congestion_probability),
-          borderColor: '#0284c7',
-          tension: 0.3,
-          fill: true,
-          backgroundColor: 'rgba(2, 132, 199, 0.1)'
-        }]
+        labels: trendData.map((r) =>
+          new Date(r.timestamp).toLocaleTimeString(),
+        ),
+        datasets: [
+          {
+            label: "Congestion Prob",
+            data: trendData.map((r) => r.congestion_probability),
+            borderColor: "#0284c7",
+            tension: 0.3,
+            fill: true,
+            backgroundColor: "rgba(2, 132, 199, 0.1)",
+          },
+        ],
       },
-      options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 1 } } }
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { y: { min: 0, max: 1 } },
+      },
     });
   }
 
@@ -232,14 +317,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    [advisoryCard, predictionCard, simulationCard, recommendationCard].forEach(c => c.classList.add("hidden"));
+    [advisoryCard, predictionCard, simulationCard, recommendationCard].forEach(
+      (c) => c.classList.add("hidden"),
+    );
     loadingState.classList.remove("hidden");
 
     // Fields that must remain as strings (not coerced to numbers)
     const STRING_FIELDS = new Set(["origin_port", "destination_port"]);
 
     const inputData = {};
-    Object.values(CSV_FIELD_MAP).forEach(id => {
+    Object.values(CSV_FIELD_MAP).forEach((id) => {
       const el = document.getElementById(id);
       if (!el) return;
       if (el.tagName === "SELECT" || STRING_FIELDS.has(id)) {
@@ -293,8 +380,11 @@ document.addEventListener("DOMContentLoaded", () => {
     badge.className = `badge ${pred.risk_level.toLowerCase()}`;
     const probPct = (pred.congestion_probability * 100).toFixed(1);
     document.getElementById("prob-val").textContent = `${probPct}%`;
-    document.getElementById("occ-val").textContent = `${(pred.predicted_berth_occupancy_t_plus_2 * 100).toFixed(1)}%`;
-    setTimeout(() => { document.getElementById("prob-bar").style.width = `${probPct}%`; }, 100);
+    document.getElementById("occ-val").textContent =
+      `${(pred.predicted_berth_occupancy_t_plus_2 * 100).toFixed(1)}%`;
+    setTimeout(() => {
+      document.getElementById("prob-bar").style.width = `${probPct}%`;
+    }, 100);
   }
 
   function renderSimulation(sim) {
@@ -302,22 +392,30 @@ document.addEventListener("DOMContentLoaded", () => {
     const congBadge = document.getElementById("congestion-badge");
     congBadge.textContent = sim.congestion_level;
     congBadge.className = `badge ${sim.congestion_level.toLowerCase()}`;
-    document.getElementById("sim-route-label").textContent = `${sim.origin_port} → ${sim.destination_port}`;
-    document.getElementById("delay-val").textContent = `${sim.estimated_delay_hours.toFixed(1)} hrs`;
-    document.getElementById("delay-p90-val").textContent = `${sim.delay_p90.toFixed(1)} hrs`;
-    document.getElementById("disruption-prob-val").textContent = `${(sim.prob_disruption * 100).toFixed(1)}%`;
-    document.getElementById("sla-breach-val").textContent = `${(sim.prob_missed_sla * 100).toFixed(1)}%`;
+    document.getElementById("sim-route-label").textContent =
+      `${sim.origin_port} → ${sim.destination_port}`;
+    document.getElementById("delay-val").textContent =
+      `${sim.estimated_delay_hours.toFixed(1)} hrs`;
+    document.getElementById("delay-p90-val").textContent =
+      `${sim.delay_p90.toFixed(1)} hrs`;
+    document.getElementById("disruption-prob-val").textContent =
+      `${(sim.prob_disruption * 100).toFixed(1)}%`;
+    document.getElementById("sla-breach-val").textContent =
+      `${(sim.prob_missed_sla * 100).toFixed(1)}%`;
 
     if (sim.recommended_route) {
       document.getElementById("recommended-route-block").style.display = "flex";
-      document.getElementById("recommended-route-text").textContent = sim.recommended_route;
+      document.getElementById("recommended-route-text").textContent =
+        sim.recommended_route;
     }
   }
 
   function renderRecommendations(recs) {
     recommendationCard.classList.remove("hidden");
     const container = document.getElementById("routes-container");
-    container.innerHTML = recs.map(rec => `
+    container.innerHTML = recs
+      .map(
+        (rec) => `
       <div class="route-item">
         <div class="route-item-main">
           <div class="route-name">${rec.route}</div>
@@ -328,23 +426,19 @@ document.addEventListener("DOMContentLoaded", () => {
           <span>Delay Factor: <strong>${rec.delay_factor.toFixed(2)}</strong></span>
         </div>
       </div>
-    `).join("");
+    `,
+      )
+      .join("");
   }
 
   function showToast(message, type = "success") {
     const toast = document.createElement("div");
     toast.className = `toast ${type}`;
     toast.textContent = message;
-    toast.style.cssText = `position: fixed; bottom: 2rem; right: 2rem; background: ${type === 'error' ? '#dc2626' : '#16a34a'}; color: white; padding: 1rem 2rem; border-radius: 12px; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.1);`;
+    toast.style.cssText = `position: fixed; bottom: 2rem; right: 2rem; background: ${type === "error" ? "#dc2626" : "#16a34a"}; color: white; padding: 1rem 2rem; border-radius: 12px; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.1);`;
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 3000);
   }
 
-  // Wait for auth to be ready before initial load
-  const checkAuth = setInterval(() => {
-    if (window.firebaseAuthToken) {
-      fetchHistory();
-      clearInterval(checkAuth);
-    }
-  }, 500);
+  fetchHistory();
 });
