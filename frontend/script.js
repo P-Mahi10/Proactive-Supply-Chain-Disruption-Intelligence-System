@@ -1,4 +1,4 @@
-import API_BASE_URL from "./src/config/api.js";
+import API_BASE_URL from "./api.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("pipeline-form");
