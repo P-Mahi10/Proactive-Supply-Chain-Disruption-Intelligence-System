@@ -1,3 +1,4 @@
+import json
 import os
 import uuid
 from typing import Dict, List, Union
@@ -14,6 +15,7 @@ logger = get_logger(__name__)
 # Initialize Firebase
 backend_dir = Path(__file__).resolve().parent.parent.parent
 env_service_account_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT_PATH")
+env_service_account_json = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON")
 
 candidate_paths = []
 if env_service_account_path:
@@ -27,9 +29,17 @@ service_account_path = next((path for path in candidate_paths if path.exists()),
 db = None
 
 try:
-    if service_account_path is not None:
+    if env_service_account_json:
+        service_account_info = json.loads(env_service_account_json)
+        cred = credentials.Certificate(service_account_info)
+        logger.info("Using Firebase credentials from FIREBASE_SERVICE_ACCOUNT_JSON.")
+    elif service_account_path is not None:
         logger.info(f"Using Firebase credentials from: {service_account_path}")
         cred = credentials.Certificate(str(service_account_path))
+    else:
+        cred = None
+
+    if cred is not None:
         if not firebase_admin._apps:
             firebase_admin.initialize_app(cred)
         db = firestore.client()
@@ -116,3 +126,16 @@ def get_recent_runs(user_id: str = "", limit: int = 10) -> List[dict]:
     except Exception as e:
         logger.error(f"Failed to fetch pipeline history: {e}")
         return []
+
+
+def save_chat_message(conversation_id: str, message: Dict[str, Union[str, int, float, bool, dict, list]]) -> bool:
+    if db is None:
+        logger.warning("Firebase is not initialized. Skipping chat save.")
+        return False
+
+    try:
+        db.collection("ai_conversations").document(conversation_id).collection("messages").add(message)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to save chat message to Firebase: {e}")
+        return False

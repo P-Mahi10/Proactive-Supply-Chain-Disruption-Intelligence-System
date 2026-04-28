@@ -1,7 +1,20 @@
-const isLocal = window.location.protocol === "file:"
-  || ["localhost", "127.0.0.1"].includes(window.location.hostname);
+const isLocal =
+  window.location.protocol === "file:" ||
+  ["localhost", "127.0.0.1"].includes(window.location.hostname);
 
-export const API_BASE_URL  = (window.API_BASE_URL  || (isLocal ? "http://localhost:8000" : "/api")).replace(/\/$/, "");
-export const NODE_BASE_URL = (window.NODE_BASE_URL || (isLocal ? "http://localhost:5000" : "/node")).replace(/\/$/, "");
+const runtimeBaseUrl =
+  window.API_BASE_URL || (window.__ENV__ && window.__ENV__.API_BASE_URL);
+const buildTimeBaseUrl =
+  typeof process !== "undefined" && process.env && process.env.API_BASE_URL
+    ? process.env.API_BASE_URL
+    : "";
+
+export const API_BASE_URL = (
+  runtimeBaseUrl ||
+  buildTimeBaseUrl ||
+  (isLocal
+    ? "http://localhost:8000"
+    : "https://proactive-supply-chain-disruption.onrender.com")
+).replace(/\/$/, "");
 
 export default API_BASE_URL;

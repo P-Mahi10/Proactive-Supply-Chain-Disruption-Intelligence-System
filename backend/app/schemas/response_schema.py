@@ -45,6 +45,14 @@ class RecommendationItem(BaseModel):
     reason: str = ""
 
 
+class RouteSummary(BaseModel):
+    origin: str
+    destination: str
+    name: str
+    cost_per_unit: float
+    estimated_time_hours: float
+
+
 class PipelineResponse(BaseModel):
     prediction: PredictionResponse
     simulation: Optional[SimulationResponse] = None

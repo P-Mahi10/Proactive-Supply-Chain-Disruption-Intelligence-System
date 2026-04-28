@@ -1,15 +1,17 @@
 from typing import List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
-from app.schemas.request_schema import InputRequest
+from app.schemas.request_schema import ChatRequest, InputRequest
 from app.schemas.response_schema import (
     PipelineResponse,
     PredictionResponse,
     RecommendationItem,
+    RouteSummary,
     SimulationResponse,
 )
 from app.services import (
+    db_service,
     firebase_service,
     pipeline_service,
     prediction_service,
@@ -72,3 +74,21 @@ def get_history(limit: int = 20):
         limit=limit,
     )
     return history
+
+
+@router.get("/routes", response_model=list[RouteSummary])
+def get_routes(limit: int = 5):
+    logger.info("Request received: /routes")
+    return db_service.fetch_best_routes(limit=limit)
+
+
+@router.post("/chat")
+def save_chat(request: ChatRequest):
+    logger.info("Request received: /chat")
+    saved = firebase_service.save_chat_message(
+        conversation_id=request.conversation_id,
+        message=request.message,
+    )
+    if not saved:
+        raise HTTPException(status_code=503, detail="Firebase not initialized")
+    return {"status": "saved"}
