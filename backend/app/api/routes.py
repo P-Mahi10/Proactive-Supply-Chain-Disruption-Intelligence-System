@@ -1,12 +1,20 @@
 from typing import List
 
-from fastapi import APIRouter, Depends
-
-from app.api.auth import verify_token
+from fastapi import APIRouter
 
 from app.schemas.request_schema import InputRequest
-from app.schemas.response_schema import PipelineResponse, PredictionResponse, RecommendationItem, SimulationResponse
-from app.services import pipeline_service, prediction_service, simulation_service, solution_service
+from app.schemas.response_schema import (
+    PipelineResponse,
+    PredictionResponse,
+    RecommendationItem,
+    SimulationResponse,
+)
+from app.services import (
+    pipeline_service,
+    prediction_service,
+    simulation_service,
+    solution_service,
+)
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -14,7 +22,7 @@ router = APIRouter()
 
 
 @router.post("/predict", response_model=PredictionResponse)
-def predict(request: InputRequest, user: dict = Depends(verify_token)) -> PredictionResponse:
+def predict(request: InputRequest) -> PredictionResponse:
     logger.info("Request received: /predict")
     prediction = prediction_service.predict(request.input_data)
     logger.info("Prediction output: %s", prediction.model_dump())
@@ -22,14 +30,18 @@ def predict(request: InputRequest, user: dict = Depends(verify_token)) -> Predic
 
 
 @router.post("/simulate", response_model=SimulationResponse)
-def simulate(request: InputRequest, user: dict = Depends(verify_token)) -> SimulationResponse:
+def simulate(request: InputRequest) -> SimulationResponse:
     logger.info("Request received: /simulate")
     prediction = prediction_service.predict(request.input_data)
 
     threshold = prediction_service.get_threshold()
     if not simulation_service.should_trigger(prediction, threshold):
         logger.info("Simulation skipped (risk below threshold).")
-        return SimulationResponse(estimated_delay_hours=0.0, queue_size=0.0, congestion_level="LOW")
+        return SimulationResponse(
+            estimated_delay_hours=0.0,
+            queue_size=0.0,
+            congestion_level="LOW",
+        )
 
     simulation = simulation_service.simulate(prediction, request.input_data)
     logger.info("Simulation output: %s", simulation.model_dump())
@@ -37,7 +49,7 @@ def simulate(request: InputRequest, user: dict = Depends(verify_token)) -> Simul
 
 
 @router.post("/recommend", response_model=List[RecommendationItem])
-def recommend(request: InputRequest, user: dict = Depends(verify_token)) -> List[RecommendationItem]:
+def recommend(request: InputRequest) -> List[RecommendationItem]:
     logger.info("Request received: /recommend")
     recommendations = solution_service.get_recommendations(request.input_data)
     logger.info("Recommendation output count: %d", len(recommendations))
@@ -45,7 +57,7 @@ def recommend(request: InputRequest, user: dict = Depends(verify_token)) -> List
 
 
 @router.post("/run_pipeline", response_model=PipelineResponse)
-def run_pipeline(request: InputRequest, user: dict = Depends(verify_token)) -> PipelineResponse:
+def run_pipeline(request: InputRequest) -> PipelineResponse:
     logger.info("Request received: /run_pipeline")
     response = pipeline_service.run_pipeline(request.input_data)
     logger.info("Pipeline response assembled.")
