@@ -1,3 +1,5 @@
+import API_BASE_URL from "./src/config/api.js";
+
 document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("pipeline-form");
   const loadingState = document.getElementById("loading-spinner");
@@ -53,14 +55,11 @@ document.addEventListener("DOMContentLoaded", () => {
         headers["Authorization"] = `Bearer ${window.firebaseAuthToken}`;
       }
 
-      const response = await fetch(
-        "https://proactive-supply-chain-disruption.onrender.com",
-        {
-          method: "POST",
-          headers: headers,
-          body: JSON.stringify(payload),
-        },
-      );
+      const response = await fetch(`${API_BASE_URL}/run_pipeline`, {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify(payload),
+      });
 
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
@@ -85,9 +84,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     } catch (error) {
       console.error(error);
-      alert(
-        "Failed to connect to the backend API. Ensure the FastAPI server is running on port 8000.",
-      );
+      alert("Failed to reach the backend API. Please try again soon.");
       loadingState.classList.add("hidden");
     }
   });
