@@ -84,7 +84,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     } catch (error) {
       console.error(error);
-      alert("Failed to reach the backend API. Please try again soon.");
+      alert("Failed to connect to backend API");
       loadingState.classList.add("hidden");
     }
   });
