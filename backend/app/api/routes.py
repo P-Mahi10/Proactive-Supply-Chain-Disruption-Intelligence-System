@@ -20,11 +20,14 @@ from app.services import (
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
-router = APIRouter(dependencies=[Depends(verify_token)])
+router = APIRouter()
 
 
 @router.post("/predict", response_model=PredictionResponse)
-def predict(request: InputRequest) -> PredictionResponse:
+def predict(
+    request: InputRequest,
+    current_user: dict = Depends(verify_token),
+) -> PredictionResponse:
     logger.info("Request received: /predict")
     prediction = prediction_service.predict(request.input_data)
     logger.info("Prediction output: %s", prediction.model_dump())
@@ -32,7 +35,10 @@ def predict(request: InputRequest) -> PredictionResponse:
 
 
 @router.post("/simulate", response_model=SimulationResponse)
-def simulate(request: InputRequest) -> SimulationResponse:
+def simulate(
+    request: InputRequest,
+    current_user: dict = Depends(verify_token),
+) -> SimulationResponse:
     logger.info("Request received: /simulate")
     prediction = prediction_service.predict(request.input_data)
 
@@ -51,7 +57,10 @@ def simulate(request: InputRequest) -> SimulationResponse:
 
 
 @router.post("/recommend", response_model=List[RecommendationItem])
-def recommend(request: InputRequest) -> List[RecommendationItem]:
+def recommend(
+    request: InputRequest,
+    current_user: dict = Depends(verify_token),
+) -> List[RecommendationItem]:
     logger.info("Request received: /recommend")
     recommendations = solution_service.get_recommendations(request.input_data)
     logger.info("Recommendation output count: %d", len(recommendations))
@@ -59,15 +68,27 @@ def recommend(request: InputRequest) -> List[RecommendationItem]:
 
 
 @router.post("/run_pipeline", response_model=PipelineResponse)
-def run_pipeline(request: InputRequest) -> PipelineResponse:
+def run_pipeline(
+    request: InputRequest,
+    current_user: dict = Depends(verify_token),
+) -> PipelineResponse:
     logger.info("Request received: /run_pipeline")
-    response = pipeline_service.run_pipeline(request.input_data)
+    response = pipeline_service.run_pipeline(
+        request.input_data,
+        user_id=str(current_user.get("uid", "")),
+    )
     logger.info("Pipeline response assembled.")
     return response
 
 
 @router.get("/history")
-def get_history(limit: int = 20):
+def get_history(
+    limit: int = 20,
+    current_user: dict = Depends(verify_token),
+):
     logger.info("Request received: /history")
-    history = firebase_service.get_recent_runs(limit=limit)
+    history = firebase_service.get_recent_runs(
+        user_id=str(current_user.get("uid", "")),
+        limit=limit,
+    )
     return history

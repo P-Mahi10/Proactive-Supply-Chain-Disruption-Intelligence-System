@@ -16,7 +16,16 @@ logger = get_logger(__name__)
 def _load_dataset() -> pd.DataFrame:
     # Dataset is CSV-formatted despite the .xls extension.
     backend_root = Path(__file__).resolve().parents[2]
-    dataset_path = backend_root / "../portwatch_prediction_dataset.xls"
+    candidate_paths = [
+        backend_root / "portwatch_prediction_dataset.xls",
+        backend_root / "data" / "portwatch_prediction_dataset.xls",
+        backend_root.parent / "portwatch_prediction_dataset.xls",
+    ]
+    dataset_path = next((path for path in candidate_paths if path.exists()), None)
+    if dataset_path is None:
+        raise FileNotFoundError(
+            "Dataset not found. Expected portwatch_prediction_dataset.xls in the repo root, backend/ directory, or backend/data/."
+        )
     df = pd.read_csv(dataset_path)
     df.columns = df.columns.str.strip()
     return df

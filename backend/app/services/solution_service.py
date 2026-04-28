@@ -60,7 +60,10 @@ def get_recommendations(
     try:
         conn   = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
-        cursor.execute("""
+        origin = str(input_data.get("origin_port") or input_data.get("port_name") or "").strip()
+        destination = str(input_data.get("destination_port") or "").strip()
+
+        filtered_query = """
             SELECT r.origin, r.destination, tm.name AS route,
                    rm.cost_per_unit AS cost, rm.estimated_time_hours AS delay_factor
             FROM route_metrics rm
@@ -68,10 +71,39 @@ def get_recommendations(
             JOIN routes r        ON ro.route_id         = r.id
             JOIN transport_modes tm ON ro.transport_mode_id = tm.id
             WHERE rm.condition_type = 'current'
+        """
+        params: list[str] = []
+        if origin or destination:
+            filtered_query += """
+              AND (
+                    (%s <> '' AND (LOWER(r.origin) = LOWER(%s) OR LOWER(r.destination) = LOWER(%s)))
+                 OR (%s <> '' AND (LOWER(r.origin) = LOWER(%s) OR LOWER(r.destination) = LOWER(%s)))
+              )
+            """
+            params.extend([origin, origin, origin, destination, destination, destination])
+
+        filtered_query += """
             ORDER BY rm.cost_per_unit ASC
             LIMIT 4;
-        """)
+        """
+
+        cursor.execute(filtered_query, params)
         rows = cursor.fetchall()
+
+        if not rows and params:
+            cursor.execute("""
+                SELECT r.origin, r.destination, tm.name AS route,
+                       rm.cost_per_unit AS cost, rm.estimated_time_hours AS delay_factor
+                FROM route_metrics rm
+                JOIN route_options ro ON rm.route_option_id = ro.id
+                JOIN routes r        ON ro.route_id         = r.id
+                JOIN transport_modes tm ON ro.transport_mode_id = tm.id
+                WHERE rm.condition_type = 'current'
+                ORDER BY rm.cost_per_unit ASC
+                LIMIT 4;
+            """)
+            rows = cursor.fetchall()
+
         cursor.close()
         conn.close()
 

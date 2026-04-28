@@ -1,4 +1,4 @@
-import API_BASE_URL from "./api.js";
+import API_BASE_URL, { NODE_BASE_URL } from "./api.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   // ─── View Switching ───────────────────────────────────────────────────────────
@@ -122,10 +122,11 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // ─── History Logic ───────────────────────────────────────────────────────────
+  // Hits Node.js backend (port 5000) — handles DB/Firebase routes
   let historyData = [];
   async function fetchHistory() {
     try {
-      const response = await fetch(`${API_BASE_URL}/history`, {
+      const response = await fetch(`${NODE_BASE_URL}/history`, {
         headers: {
           "Authorization": `Bearer ${window.firebaseAuthToken}`
         }
@@ -186,7 +187,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Risk Distribution Chart
     const riskCounts = { HIGH: 0, MEDIUM: 0, LOW: 0 };
     historyData.forEach(r => riskCounts[r.risk_level]++);
-    
+
     if (riskChart) riskChart.destroy();
     riskChart = new Chart(document.getElementById("risk-dist-chart"), {
       type: 'doughnut',
@@ -221,6 +222,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ─── Form Submission ──────────────────────────────────────────────────────────
+  // Hits Python FastAPI backend (port 8000) — handles ML pipeline
   const form = document.getElementById("pipeline-form");
   const loadingState = document.getElementById("loading-spinner");
   const advisoryCard = document.getElementById("advisory-card");
@@ -233,10 +235,19 @@ document.addEventListener("DOMContentLoaded", () => {
     [advisoryCard, predictionCard, simulationCard, recommendationCard].forEach(c => c.classList.add("hidden"));
     loadingState.classList.remove("hidden");
 
+    // Fields that must remain as strings (not coerced to numbers)
+    const STRING_FIELDS = new Set(["origin_port", "destination_port"]);
+
     const inputData = {};
     Object.values(CSV_FIELD_MAP).forEach(id => {
       const el = document.getElementById(id);
-      if (el) inputData[id] = el.tagName === "SELECT" ? el.value : parseFloat(el.value) || 0;
+      if (!el) return;
+      if (el.tagName === "SELECT" || STRING_FIELDS.has(id)) {
+        inputData[id] = el.value;
+      } else {
+        const parsed = parseFloat(el.value);
+        inputData[id] = isNaN(parsed) ? 0 : parsed;
+      }
     });
 
     // Extra fields not in CSV map but in form
@@ -246,7 +257,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const response = await fetch(`${API_BASE_URL}/run_pipeline`, {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${window.firebaseAuthToken}`
         },
@@ -261,7 +272,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (data.simulation) renderSimulation(data.simulation);
       if (data.advisory) renderAdvisory(data.advisory);
       if (data.recommendation) renderRecommendations(data.recommendation);
-      
+
       showToast("Intelligence analysis complete");
       fetchHistory(); // Refresh history in background
     } catch (error) {
@@ -297,7 +308,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("delay-p90-val").textContent = `${sim.delay_p90.toFixed(1)} hrs`;
     document.getElementById("disruption-prob-val").textContent = `${(sim.prob_disruption * 100).toFixed(1)}%`;
     document.getElementById("sla-breach-val").textContent = `${(sim.prob_missed_sla * 100).toFixed(1)}%`;
-    
+
     if (sim.recommended_route) {
       document.getElementById("recommended-route-block").style.display = "flex";
       document.getElementById("recommended-route-text").textContent = sim.recommended_route;

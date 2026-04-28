@@ -27,6 +27,7 @@ def _maybe_simulate(
 
 def run_pipeline(
     input_data: Dict[str, Union[float, str]],
+    user_id: str = "",
 ) -> PipelineResponse:
     logger.info("Running pipeline orchestration.")
     
@@ -70,6 +71,7 @@ def run_pipeline(
     firebase_service.save_pipeline_run(
         output_data=response.model_dump(),
         input_data=input_data,
+        user_id=user_id,
     )
     
     return response

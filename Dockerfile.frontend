@@ -5,8 +5,8 @@ ARG API_BASE_URL=https://proactive-supply-chain-disruption.onrender.com
 # Copy static frontend files into nginx's serve directory
 COPY frontend/ /usr/share/nginx/html/
 
-# Replace default API base URL for containerized frontend builds
-RUN sed -i "s|http://localhost:8000|${API_BASE_URL}|g" /usr/share/nginx/html/api.js
+# Replace the default proxy base URL for containerized frontend builds
+RUN sed -i "s|\"/api\"|\"${API_BASE_URL}\"|g" /usr/share/nginx/html/api.js
 
 # Copy custom nginx config so /api/* proxies to the backend
 COPY nginx.conf /etc/nginx/conf.d/default.conf
