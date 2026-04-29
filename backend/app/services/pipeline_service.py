@@ -67,11 +67,17 @@ def run_pipeline(
         advisory=advisory,
     )
     
+    # Extract cost from first recommendation if available
+    cost = 0.0
+    if recommendation and len(recommendation) > 0:
+        cost = recommendation[0].cost
+    
     # Save run (input + output) to Firebase for history
     firebase_service.save_pipeline_run(
         output_data=response.model_dump(),
         input_data=input_data,
         user_id=user_id,
+        cost=cost,
     )
     
     return response

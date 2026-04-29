@@ -50,7 +50,7 @@ except Exception as e:
     logger.error(f"Failed to initialize Firebase: {e}")
 
 
-def save_pipeline_run(output_data: dict, input_data: dict = None, user_id: str = "") -> str:
+def save_pipeline_run(output_data: dict, input_data: dict = None, user_id: str = "", cost: float = 0.0) -> str:
     """
     Saves the full pipeline run (inputs + outputs) to Firebase Firestore.
     Returns the document ID.
@@ -66,16 +66,19 @@ def save_pipeline_run(output_data: dict, input_data: dict = None, user_id: str =
         origin = (input_data or {}).get("origin_port", "Unknown")
         destination = (input_data or {}).get("destination_port", "Unknown")
 
-        doc_ref.set({
+        data_to_save = {
             "input_data": input_data or {},
             "output_data": output_data,
             "user_id": user_id,
             "origin_port": origin,
             "destination_port": destination,
+            "cost": cost,
             "timestamp": datetime.utcnow(),
-        })
-
-        logger.info(f"Saved pipeline run {doc_id} ({origin} → {destination})")
+        }
+        
+        logger.info(f"Saving pipeline run: doc_id={doc_id}, user_id={user_id}, cost={cost}, origin={origin} → {destination}")
+        doc_ref.set(data_to_save)
+        logger.info(f"Successfully saved pipeline run {doc_id}")
         return doc_id
 
     except Exception as e:
@@ -83,10 +86,12 @@ def save_pipeline_run(output_data: dict, input_data: dict = None, user_id: str =
         return ""
 
 
+
 def get_recent_runs(user_id: str = "", limit: int = 10) -> List[dict]:
     """
     Fetches the most recent pipeline runs from Firestore.
     If user_id provided, filters to that user; otherwise returns all recent runs.
+    Returns empty list if no data is available.
     """
     if db is None:
         logger.warning("Firebase not initialized. Cannot fetch history.")
@@ -94,24 +99,33 @@ def get_recent_runs(user_id: str = "", limit: int = 10) -> List[dict]:
 
     try:
         col = db.collection("pipeline_runs")
+        logger.info(f"Querying pipeline_runs collection. user_id={user_id if user_id else 'ALL'}, limit={limit}")
 
         if user_id:
+            logger.info(f"Building user-filtered query for user_id: {user_id}")
             query = (
                 col.where("user_id", "==", user_id)
                    .order_by("timestamp", direction=firestore.Query.DESCENDING)
                    .limit(limit)
             )
         else:
+            logger.info("Building query for all users (no user_id filter)")
             query = (
                 col.order_by("timestamp", direction=firestore.Query.DESCENDING)
                    .limit(limit)
             )
 
-        docs = query.stream()
+        docs = list(query.stream())
+        logger.info(f"Query returned {len(docs)} documents")
+        
         results = []
-        for doc in docs:
+        for i, doc in enumerate(docs):
             d = doc.to_dict()
             ts = d.get("timestamp")
+            doc_user_id = d.get("user_id", "NO_USER_ID")
+            doc_cost = d.get("cost", 0.0)
+            logger.info(f"  Doc {i+1}: id={doc.id}, user_id={doc_user_id}, cost={doc_cost}, timestamp={ts}")
+            
             results.append({
                 "id": doc.id,
                 "origin_port": d.get("origin_port", "—"),
@@ -119,12 +133,15 @@ def get_recent_runs(user_id: str = "", limit: int = 10) -> List[dict]:
                 "timestamp": ts.isoformat() if ts else "",
                 "risk_level": (d.get("output_data") or {}).get("prediction", {}).get("risk_level", "—"),
                 "congestion_probability": (d.get("output_data") or {}).get("prediction", {}).get("congestion_probability", 0),
+                "cost": d.get("cost", 0.0),
                 "input_data": d.get("input_data", {}),
             })
+        
+        logger.info(f"Returning {len(results)} records")
         return results
 
     except Exception as e:
-        logger.error(f"Failed to fetch pipeline history: {e}")
+        logger.error(f"Failed to fetch pipeline history: {e}", exc_info=True)
         return []
 
 

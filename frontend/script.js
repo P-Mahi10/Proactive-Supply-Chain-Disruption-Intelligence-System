@@ -1,5 +1,31 @@
 import API_BASE_URL from "./api.js";
 
+// ─── Authenticated Fetch Helper ───────────────────────────────────────────────
+async function authenticatedFetch(endpoint, options = {}) {
+  const token = window.firebaseAuthToken;
+  console.log(`[authenticatedFetch] Endpoint: ${endpoint}, Token: ${token ? "Present" : "MISSING"}`);
+  
+  const headers = {
+    "Content-Type": "application/json",
+    ...options.headers,
+  };
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+    console.log(`[authenticatedFetch] Added Authorization header`);
+  } else {
+    console.warn(`[authenticatedFetch] WARNING: No token available for ${endpoint}`);
+  }
+
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    ...options,
+    headers,
+  });
+  
+  console.log(`[authenticatedFetch] ${endpoint} responded with status ${response.status}`);
+  return response;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   // ─── View Switching ───────────────────────────────────────────────────────────
   const navBtns = document.querySelectorAll(".nav-btn");
@@ -9,9 +35,14 @@ document.addEventListener("DOMContentLoaded", () => {
     btn.addEventListener("click", () => {
       const target = btn.dataset.view;
       navBtns.forEach((b) => b.classList.remove("active"));
-      viewPanes.forEach((p) => p.classList.remove("active"));
+      viewPanes.forEach((p) => {
+        p.classList.remove("active");
+        p.classList.add("hidden");
+      });
       btn.classList.add("active");
-      document.getElementById(target).classList.add("active");
+      const targetPane = document.getElementById(target);
+      targetPane.classList.add("active");
+      targetPane.classList.remove("hidden");
 
       if (target === "history-view") fetchHistory();
       if (target === "dashboard-view") {
@@ -20,6 +51,11 @@ document.addEventListener("DOMContentLoaded", () => {
         } else {
           updateDashboard();
         }
+        // Trigger chart resize after view is shown
+        setTimeout(() => {
+          if (riskChart) riskChart.resize();
+          if (trendChart) trendChart.resize();
+        }, 100);
       }
     });
   });
@@ -185,26 +221,43 @@ document.addEventListener("DOMContentLoaded", () => {
   let historyData = [];
   async function fetchHistory() {
     try {
-      const response = await fetch(`${API_BASE_URL}/history`);
+      console.log("[fetchHistory] Starting to fetch history...");
+      console.log("[fetchHistory] Auth token present:", window.firebaseAuthToken ? "Yes" : "No");
+      
+      const response = await authenticatedFetch("/history");
+      
       if (!response.ok) {
         const body = await response.text().catch(() => "<no body>");
-        console.error("History fetch failed", {
-          status: response.status,
-          body,
-        });
+        console.error("[fetchHistory] Failed with status", response.status, "body:", body);
         throw new Error(`Failed to fetch history: HTTP ${response.status}`);
       }
+      
       historyData = await response.json();
+      console.log("[fetchHistory] Success! Received", historyData.length, "records:", historyData);
+      
       renderHistoryList();
       updateDashboard();
     } catch (err) {
-      console.error(err);
+      console.error("[fetchHistory] Error:", err);
       showToast("Error loading history", "error");
     }
   }
 
   function renderHistoryList() {
     const body = document.getElementById("history-list-body");
+    
+    // Show empty state if no data
+    if (!historyData || historyData.length === 0) {
+      body.innerHTML = `
+        <tr>
+          <td colspan="7" style="text-align: center; padding: 2rem; color: #64748b;">
+            No shipment history yet. Run an intelligence analysis to see results here.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+    
     body.innerHTML = historyData
       .map(
         (run) => `
@@ -214,12 +267,14 @@ document.addEventListener("DOMContentLoaded", () => {
         <td>${run.destination_port}</td>
         <td><span class="badge ${run.risk_level.toLowerCase()}">${run.risk_level}</span></td>
         <td>${(run.congestion_probability * 100).toFixed(1)}%</td>
+        <td>$${run.cost.toLocaleString("en-US", { maximumFractionDigits: 2 })}</td>
         <td><button class="load-run-btn" data-id="${run.id}">Load</button></td>
       </tr>
     `,
       )
       .join("");
-
+    
+    // Attach event listeners to load buttons
     body.querySelectorAll(".load-run-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         const run = historyData.find((r) => r.id === btn.dataset.id);
@@ -244,7 +299,60 @@ document.addEventListener("DOMContentLoaded", () => {
   // ─── Dashboard Logic ─────────────────────────────────────────────────────────
   let riskChart, trendChart;
   function updateDashboard() {
-    if (historyData.length === 0) return;
+    const dashboardStatsGrid = document.querySelector(".dashboard-stats-grid");
+    const chartsGrid = document.querySelector(".charts-grid");
+    
+    if (historyData.length === 0) {
+      // Show empty state
+      dashboardStatsGrid.innerHTML = `
+        <div style="grid-column: 1/-1; text-align: center; padding: 3rem 2rem; color: #64748b;">
+          <i class="fa-solid fa-inbox" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+          <p style="font-size: 1.1rem; margin: 1rem 0;">No shipment data available yet.</p>
+          <p style="font-size: 0.95rem; opacity: 0.8;">Run an intelligence analysis from the Intelligence tab to populate the dashboard.</p>
+        </div>
+      `;
+      chartsGrid.innerHTML = `
+        <div style="grid-column: 1/-1; text-align: center; padding: 3rem 2rem; color: #64748b;">
+          Charts will appear once you have shipment data.
+        </div>
+      `;
+      return;
+    }
+
+    // Restore normal grid layout when data is available
+    dashboardStatsGrid.innerHTML = `
+      <div class="glass-panel stat-card">
+        <h3>Total Runs</h3>
+        <div class="stat-value" id="total-runs-stat">0</div>
+      </div>
+      <div class="glass-panel stat-card">
+        <h3>High Risk Rate</h3>
+        <div class="stat-value" id="high-risk-rate-stat">0%</div>
+      </div>
+      <div class="glass-panel stat-card">
+        <h3>Avg Congestion</h3>
+        <div class="stat-value" id="avg-congestion-stat">0%</div>
+      </div>
+      <div class="glass-panel stat-card">
+        <h3>Total Cost</h3>
+        <div class="stat-value" id="total-cost-stat">$0</div>
+      </div>
+      <div class="glass-panel stat-card">
+        <h3>Avg Cost</h3>
+        <div class="stat-value" id="avg-cost-stat">$0</div>
+      </div>
+    `;
+    
+    chartsGrid.innerHTML = `
+      <div class="glass-panel chart-container">
+        <h3>Risk Level Distribution</h3>
+        <canvas id="risk-dist-chart"></canvas>
+      </div>
+      <div class="glass-panel chart-container">
+        <h3>Congestion Probability Trend</h3>
+        <canvas id="congestion-trend-chart"></canvas>
+      </div>
+    `;
 
     // Update Stats
     document.getElementById("total-runs-stat").textContent = historyData.length;
@@ -258,52 +366,80 @@ document.addEventListener("DOMContentLoaded", () => {
       historyData.length;
     document.getElementById("avg-congestion-stat").textContent =
       (avgCong * 100).toFixed(1) + "%";
+    
+    // Cost Stats
+    const totalCost = historyData.reduce((acc, r) => acc + r.cost, 0);
+    const avgCost = totalCost / historyData.length;
+    document.getElementById("total-cost-stat").textContent =
+      `$${totalCost.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+    document.getElementById("avg-cost-stat").textContent =
+      `$${avgCost.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
 
-    // Risk Distribution Chart
-    const riskCounts = { HIGH: 0, MEDIUM: 0, LOW: 0 };
-    historyData.forEach((r) => riskCounts[r.risk_level]++);
+    // Small delay to ensure canvas elements are in DOM and have dimensions
+    setTimeout(() => {
+      // Risk Distribution Chart
+      const riskCounts = { HIGH: 0, MEDIUM: 0, LOW: 0 };
+      historyData.forEach((r) => riskCounts[r.risk_level]++);
 
-    if (riskChart) riskChart.destroy();
-    riskChart = new Chart(document.getElementById("risk-dist-chart"), {
-      type: "doughnut",
-      data: {
-        labels: ["High", "Medium", "Low"],
-        datasets: [
-          {
-            data: [riskCounts.HIGH, riskCounts.MEDIUM, riskCounts.LOW],
-            backgroundColor: ["#dc2626", "#d97706", "#16a34a"],
+      if (riskChart) riskChart.destroy();
+      const riskCtx = document.getElementById("risk-dist-chart");
+      if (riskCtx) {
+        riskChart = new Chart(riskCtx, {
+          type: "doughnut",
+          data: {
+            labels: ["High", "Medium", "Low"],
+            datasets: [
+              {
+                data: [riskCounts.HIGH, riskCounts.MEDIUM, riskCounts.LOW],
+                backgroundColor: ["#dc2626", "#d97706", "#16a34a"],
+              },
+            ],
           },
-        ],
-      },
-      options: { responsive: true, maintainAspectRatio: false },
-    });
-
-    // Trend Chart
-    const trendData = [...historyData].reverse().slice(-10);
-    if (trendChart) trendChart.destroy();
-    trendChart = new Chart(document.getElementById("congestion-trend-chart"), {
-      type: "line",
-      data: {
-        labels: trendData.map((r) =>
-          new Date(r.timestamp).toLocaleTimeString(),
-        ),
-        datasets: [
-          {
-            label: "Congestion Prob",
-            data: trendData.map((r) => r.congestion_probability),
-            borderColor: "#0284c7",
-            tension: 0.3,
-            fill: true,
-            backgroundColor: "rgba(2, 132, 199, 0.1)",
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: "bottom" },
+            },
           },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: { y: { min: 0, max: 1 } },
-      },
-    });
+        });
+      }
+
+      // Trend Chart
+      const trendData = [...historyData].reverse().slice(-10);
+      if (trendChart) trendChart.destroy();
+      const trendCtx = document.getElementById("congestion-trend-chart");
+      if (trendCtx) {
+        trendChart = new Chart(trendCtx, {
+          type: "line",
+          data: {
+            labels: trendData.map((r) =>
+              new Date(r.timestamp).toLocaleTimeString(),
+            ),
+            datasets: [
+              {
+                label: "Congestion Prob",
+                data: trendData.map((r) => r.congestion_probability),
+                borderColor: "#0284c7",
+                backgroundColor: "rgba(2, 132, 199, 0.1)",
+                tension: 0.3,
+                fill: true,
+                pointRadius: 3,
+                pointBackgroundColor: "#0284c7",
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: "top" },
+            },
+            scales: { y: { min: 0, max: 1 } },
+          },
+        });
+      }
+    }, 50);
   }
 
   // ─── Form Submission ──────────────────────────────────────────────────────────
@@ -342,16 +478,22 @@ document.addEventListener("DOMContentLoaded", () => {
     inputData.season = document.getElementById("season").value;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/run_pipeline`, {
+      console.log("[Form Submit] Submitting intelligence analysis with input data:", inputData);
+      console.log("[Form Submit] Auth token available:", window.firebaseAuthToken ? "Yes" : "No");
+      
+      const response = await authenticatedFetch("/run_pipeline", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({ input_data: inputData }),
       });
 
-      if (!response.ok) throw new Error("Pipeline run failed");
+      if (!response.ok) {
+        const errBody = await response.text().catch(() => "No error body");
+        console.error("[Form Submit] Pipeline failed with status", response.status, "body:", errBody);
+        throw new Error("Pipeline run failed");
+      }
+      
       const data = await response.json();
+      console.log("[Form Submit] Pipeline succeeded! Response:", data);
       loadingState.classList.add("hidden");
 
       renderPrediction(data.prediction);
@@ -360,9 +502,15 @@ document.addEventListener("DOMContentLoaded", () => {
       if (data.recommendation) renderRecommendations(data.recommendation);
 
       showToast("Intelligence analysis complete");
-      fetchHistory(); // Refresh history in background
+      
+      // Refresh history after a small delay to ensure data is written to Firestore
+      console.log("[Form Submit] Waiting 500ms for Firestore write...");
+      setTimeout(() => {
+        console.log("[Form Submit] Refreshing history after pipeline run");
+        fetchHistory();
+      }, 500);
     } catch (error) {
-      console.error(error);
+      console.error("[Form Submit] Error:", error);
       showToast(error.message, "error");
       loadingState.classList.add("hidden");
     }
