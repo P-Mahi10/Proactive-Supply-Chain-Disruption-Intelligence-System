@@ -17,6 +17,7 @@ from app.services import (
     prediction_service,
     simulation_service,
     solution_service,
+    weather_service,
 )
 from app.utils.logger import get_logger
 
@@ -92,3 +93,33 @@ def save_chat(request: ChatRequest):
     if not saved:
         raise HTTPException(status_code=503, detail="Firebase not initialized")
     return {"status": "saved"}
+
+
+@router.post("/fetch_weather")
+def fetch_weather(request: InputRequest):
+    logger.info("Request received: /fetch_weather")
+    input_data = request.input_data
+
+    # Extract required parameters
+    origin_port = input_data.get("origin_port")
+    destination_port = input_data.get("destination_port")
+    season = input_data.get("season", "summer")
+    month = int(input_data.get("month", 1))
+    day_of_week = int(input_data.get("day_of_week", 0))
+
+    if not origin_port or not destination_port:
+        raise HTTPException(
+            status_code=400,
+            detail="origin_port and destination_port are required"
+        )
+
+    weather_data = weather_service.fetch_weather_data(
+        origin_port=origin_port,
+        destination_port=destination_port,
+        season=season,
+        month=month,
+        day_of_week=day_of_week,
+    )
+
+    logger.info("Weather data fetched successfully")
+    return weather_data

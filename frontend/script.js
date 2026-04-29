@@ -38,6 +38,73 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  // ─── Fetch Weather Data ───────────────────────────────────────────────────
+  const fetchWeatherBtn = document.getElementById("fetch-weather-btn");
+  if (fetchWeatherBtn) {
+    fetchWeatherBtn.addEventListener("click", async () => {
+      // Get values from Route tab
+      const originPort = document.getElementById("origin_port").value;
+      const destinationPort = document.getElementById("destination_port").value;
+      const season = document.getElementById("season").value;
+
+      // Get values from Temporal tab
+      const month = document.getElementById("month").value;
+      const dayOfWeek = document.getElementById("day_of_week").value;
+
+      if (!originPort || !destinationPort) {
+        showToast("Please select origin and destination ports first", "error");
+        return;
+      }
+
+      fetchWeatherBtn.disabled = true;
+      fetchWeatherBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Fetching...';
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/fetch_weather`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            input_data: {
+              origin_port: originPort,
+              destination_port: destinationPort,
+              season: season,
+              month: parseInt(month),
+              day_of_week: parseInt(dayOfWeek),
+            },
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch weather data");
+        }
+
+        const weatherData = await response.json();
+
+        // Populate weather fields with fetched data
+        document.getElementById("weather_forecast_severity").value =
+          weatherData.weather_forecast_severity;
+        document.getElementById("cyclone_probability").value =
+          weatherData.cyclone_probability;
+        document.getElementById("wind_speed_kmh").value =
+          weatherData.wind_speed_kmh;
+        document.getElementById("wave_height_m").value = weatherData.wave_height_m;
+        document.getElementById("rainfall_mm").value = weatherData.rainfall_mm;
+        document.getElementById("visibility_km").value = weatherData.visibility_km;
+
+        showToast("Weather data fetched successfully");
+      } catch (error) {
+        console.error(error);
+        showToast("Error fetching weather data: " + error.message, "error");
+      } finally {
+        fetchWeatherBtn.disabled = false;
+        fetchWeatherBtn.innerHTML =
+          '<i class="fa-solid fa-cloud"></i> Fetch Weather Data';
+      }
+    });
+  }
+
   // ─── CSV Upload & Auto-fill ───────────────────────────────────────────────────
   const csvUploadInput = document.getElementById("csv-upload");
   const CSV_FIELD_MAP = {
